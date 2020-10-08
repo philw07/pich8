@@ -1,0 +1,16 @@
+[package]
+name = "pich8"
+version = "0.1.0"
+authors = ["Philipp W <phil.w07@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.7.3"
+minifb = "0.19.1"
+rodio = "0.12.0"
+bitvec = { version = "0.19.3", features = ["serde"] }
+getset = "0.1.1"
+serde = { version = "1.0.117", features = ["derive"] }
+rmp-serde = "0.14.4"
