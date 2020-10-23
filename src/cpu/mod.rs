@@ -41,7 +41,7 @@ pub struct CPU {
     #[getset(get = "pub")]
     vmem: BitArray<Msb0, [u64; 32]>,    // Graphics memory
     stack: [u16; 16],                   // Stack to store locations before a jump occurs
-    keys: [bool; 16],                   // Keypad status
+    keys: BitArray<Msb0, [u16; 1]>,     // Keypad status
 
     PC: u16,                            // Program counter
     V: [u8; 16],                        // Registers
@@ -54,8 +54,6 @@ pub struct CPU {
 
     #[getset(get_copy = "pub", set = "pub")]
     draw: bool,                         // Drawing flag
-    #[getset(get_copy = "pub")]
-    sound_active: bool,                 // Sound active flag
     key_wait: bool,                     // Key wait flag
     key_reg: usize,                     // Key wait register
     quirk_load_store: bool,             // Flag for load store quirk
@@ -90,7 +88,7 @@ impl CPU {
             mem: [0; 4096],
             vmem: bitarr![Msb0, u64; 0; 64*32],
             stack: [0; 16],
-            keys: [false; 16],
+            keys: bitarr![Msb0, u16; 0; 16],
 
             PC: CPU::PC_INITIAL,
             V: [0; 16],
@@ -102,7 +100,6 @@ impl CPU {
             sp: 0,
 
             draw: false,
-            sound_active: false,
             key_wait: false,
             key_reg: 0,
             quirk_load_store: true,
@@ -129,6 +126,10 @@ impl CPU {
         self.PC = CPU::PC_INITIAL;
     }
 
+    pub fn sound_active(&self) -> bool {
+        self.ST > 0
+    }
+
     pub fn update_timers(&mut self) {
         if self.DT > 0 {
             self.DT -= 1;
@@ -138,8 +139,8 @@ impl CPU {
         }
     }
 
-    pub fn tick(&mut self, keys: &[bool; 16]) {
-        self.keys.copy_from_slice(keys);
+    pub fn tick(&mut self, keys: &BitArray<Msb0, [u16; 1]>) {
+        self.keys.copy_from_bitslice(keys);
         if self.key_wait {
             for i in 0..keys.len() {
                 if keys[i] {

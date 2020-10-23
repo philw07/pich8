@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod contracts;
 mod cpu;
 mod display;
@@ -14,6 +16,6 @@ fn main() {
         path = v[1].clone();
     }
     
-    let mut emu = Emulator::new();
+    let mut emu = Emulator::new().unwrap();
     emu.run(&std::fs::read(&path).unwrap());
 }

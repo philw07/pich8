@@ -1,53 +1,64 @@
 use crate::contracts::DisplayOutput;
 use bitvec::prelude::*;
-use minifb::{Window, WindowOptions, Key};
+use getset::{Setters};
+use sdl2::{
+    Sdl,
+    video::Window,
+    render::Canvas,
+    pixels::Color,
+    rect::Rect,
+};
 
+#[derive(Setters)]
 pub struct WindowDisplay {
-    window: Window,
+    canvas: Canvas<Window>,
+    #[getset(set = "pub")]
+    bg_color: Color,
+    #[getset(set = "pub")]
+    fg_color: Color,
 }
 
 impl DisplayOutput for WindowDisplay {
-    fn draw(&mut self, buffer: &BitArray<Msb0, [u64; 32]>) {
-        let mut big_buffer: [u32; 640*320] = [0; 640*320];
-        for x in 0..640 {
-            for y in 0..320 {
-                let big_pos = self.get_coordinate(x, y, true);
-                let small_pos = self.get_coordinate(x/10, y/10, false);
-                if buffer[small_pos] {
-                    big_buffer[big_pos] = 0x00FF00;
-                }
-            } 
+    fn draw(&mut self, buffer: &BitArray<Msb0, [u64; 32]>) -> Result<(), String> {
+        self.canvas.set_draw_color(self.bg_color);
+        self.canvas.clear();
+
+        // Draw
+        let scale = 10;
+        for y in 0..32 {
+            for x in 0..64 {
+                self.canvas.set_draw_color(if buffer[self.get_index(x, y)] { self.fg_color } else { self.bg_color });
+                self.canvas.fill_rect(Rect::new(scale*x as i32, scale*y as i32, scale as u32, scale as u32))?;
+            }
         }
-        self.window.update_with_buffer(&big_buffer, 640, 320).expect("couldn't update window");
+
+        self.canvas.present();
+        Ok(())
     }
 }
 
 impl WindowDisplay {
-    const WINDOW_NAME: &'static str = "c8e-rs";
+    const WINDOW_NAME: &'static str = "pich8";
+    const BG_COLOR: Color = Color::BLACK;
+    const FG_COLOR: Color = Color::WHITE;
 
-    pub fn new() -> Self {
-        Self{
-            window: Window::new(WindowDisplay::WINDOW_NAME, 640, 320, WindowOptions::default()).expect("couldn't create window"),
-        }
+    pub fn new(sdl_context: &Sdl) -> Result<Self, String> {
+        let window = sdl_context
+            .video()?
+            .window(WindowDisplay::WINDOW_NAME, 640, 320)
+            .position_centered()
+            .opengl()
+            .build().map_err(|e| format!("couldn't setup window: {}", e))?;
+        let canvas = window.into_canvas().build().map_err(|e| format!("couldn't setup canvas: {}", e))?;
+
+        Ok(Self{
+            canvas: canvas,
+            bg_color: WindowDisplay::BG_COLOR,
+            fg_color: WindowDisplay::FG_COLOR,
+        })
     }
 
-    pub fn update(&mut self) {
-        self.window.update();
-    }
-
-    pub fn is_open(&self) -> bool {
-        self.window.is_open()
-    }
-
-    pub fn is_key_down(&self, key: Key) -> bool {
-        self.window.is_key_down(key)
-    }
-
-    fn get_coordinate(&self, x: usize, y: usize, big: bool) -> usize {
-        if big {
-            (y * 640) + x
-        } else {
-            (y * 64) + x
-        }
+    fn get_index(&self, x: usize, y: usize) -> usize {
+        (y * 64) + x
     }
 }
