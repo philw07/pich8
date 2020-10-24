@@ -3,7 +3,7 @@ use rand::prelude::*;
 use bitvec::prelude::*;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Serialize, Deserialize};
-use crate::util::BigArray;
+use crate::serde_big_array::BigArray;
 
 mod opcodes;
 

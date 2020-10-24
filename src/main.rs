@@ -5,7 +5,7 @@ mod cpu;
 mod display;
 mod sound;
 mod emulator;
-mod util;
+mod serde_big_array;
 
 use emulator::Emulator;
 
