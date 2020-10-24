@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), windows_subsystem = "windows")]
+#![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
 mod contracts;
 mod cpu;
