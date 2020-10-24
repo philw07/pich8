@@ -3,7 +3,7 @@ use bitvec::prelude::*;
 use getset::{Setters};
 use sdl2::{
     Sdl,
-    video::Window,
+    video::{Window, FullscreenType},
     render::Canvas,
     pixels::Color,
     rect::Rect,
@@ -20,19 +20,28 @@ pub struct WindowDisplay {
 
 impl DisplayOutput for WindowDisplay {
     fn draw(&mut self, buffer: &BitArray<Msb0, [u64; 32]>) -> Result<(), String> {
+        // Clear
         self.canvas.set_draw_color(self.bg_color);
         self.canvas.clear();
 
-        // Draw
-        let scale = 10;
+        // Draw frame
+        let (width, height) = self.canvas.output_size()?;
+        let scale_w = width / WindowDisplay::C8_WIDTH;
+        let scale_h = height / WindowDisplay::C8_HEIGHT;
         for y in 0..32 {
             for x in 0..64 {
                 self.canvas.set_draw_color(if buffer[self.get_index(x, y)] { self.fg_color } else { self.bg_color });
-                self.canvas.fill_rect(Rect::new(scale*x as i32, scale*y as i32, scale as u32, scale as u32))?;
+                self.canvas.fill_rect(Rect::new(scale_w as i32 * x as i32, scale_h as i32 * y as i32, scale_w, scale_h))?;
             }
         }
 
         self.canvas.present();
+        Ok(())
+    }
+
+    fn toggle_fullscreen(&mut self) -> Result<(), String> {
+        let state = if self.canvas.window().fullscreen_state() == FullscreenType::Desktop { FullscreenType::Off } else { FullscreenType::Desktop };
+        self.canvas.window_mut().set_fullscreen(state)?;
         Ok(())
     }
 }
@@ -41,12 +50,17 @@ impl WindowDisplay {
     const WINDOW_NAME: &'static str = "pich8";
     const BG_COLOR: Color = Color::BLACK;
     const FG_COLOR: Color = Color::WHITE;
+    const WINDOW_WIDTH: u32 = 800;
+    const WINDOW_HEIGHT: u32 = WindowDisplay::WINDOW_WIDTH / (WindowDisplay::C8_WIDTH / WindowDisplay::C8_HEIGHT);
+    const C8_WIDTH: u32 = 64;
+    const C8_HEIGHT: u32 = 32;
 
     pub fn new(sdl_context: &Sdl) -> Result<Self, String> {
         let window = sdl_context
             .video()?
-            .window(WindowDisplay::WINDOW_NAME, 640, 320)
+            .window(WindowDisplay::WINDOW_NAME, WindowDisplay::WINDOW_WIDTH, WindowDisplay::WINDOW_HEIGHT)
             .position_centered()
+            .resizable()
             .opengl()
             .build().map_err(|e| format!("couldn't setup window: {}", e))?;
         let canvas = window.into_canvas().build().map_err(|e| format!("couldn't setup canvas: {}", e))?;

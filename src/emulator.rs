@@ -78,11 +78,7 @@ impl<T: SoundOutput> Emulator<T> {
                 }
             }
             self.cpu.update_timers();
-            
-            if self.cpu.draw() {
-                self.display.draw(self.cpu.vmem()).expect("failed to render frame");
-                self.cpu.set_draw(false);
-            }
+            self.display.draw(self.cpu.vmem()).expect("failed to render frame");
             
             self.sleep();
         }
@@ -93,6 +89,9 @@ impl<T: SoundOutput> Emulator<T> {
             match event {
                 Event::Quit{..} => return true,
                 Event::KeyDown{ keycode: Some(Keycode::Escape), .. } => return true,
+                Event::KeyDown{ keycode: Some(Keycode::F11), .. } => { self.display.toggle_fullscreen().unwrap(); },
+
+                // Chip8 Keys
                 Event::KeyDown{ keycode: Some(Keycode::Num1), .. } => self.input.set(0, true),
                 Event::KeyDown{ keycode: Some(Keycode::Num2), .. } => self.input.set(1, true),
                 Event::KeyDown{ keycode: Some(Keycode::Num3), .. } => self.input.set(2, true),
