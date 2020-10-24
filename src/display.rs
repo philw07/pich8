@@ -7,6 +7,7 @@ use sdl2::{
     render::Canvas,
     pixels::Color,
     rect::Rect,
+    mouse::MouseUtil,
 };
 
 #[derive(Setters)]
@@ -16,6 +17,7 @@ pub struct WindowDisplay {
     bg_color: Color,
     #[getset(set = "pub")]
     fg_color: Color,
+    mouse: MouseUtil,
 }
 
 impl DisplayOutput for WindowDisplay {
@@ -42,6 +44,7 @@ impl DisplayOutput for WindowDisplay {
     fn toggle_fullscreen(&mut self) -> Result<(), String> {
         let state = if self.canvas.window().fullscreen_state() == FullscreenType::Desktop { FullscreenType::Off } else { FullscreenType::Desktop };
         self.canvas.window_mut().set_fullscreen(state)?;
+        self.mouse.show_cursor(state == FullscreenType::Off);
         Ok(())
     }
 }
@@ -69,6 +72,7 @@ impl WindowDisplay {
             canvas: canvas,
             bg_color: WindowDisplay::BG_COLOR,
             fg_color: WindowDisplay::FG_COLOR,
+            mouse: sdl_context.mouse(),
         })
     }
 

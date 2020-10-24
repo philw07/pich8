@@ -50,7 +50,7 @@ impl Emulator<NoSound> {
 
 impl<T: SoundOutput> Emulator<T> {
     const FRAMES_PER_SEC: f64 = 60.0;
-    const TICKS_PER_SEC: u16 = 720;
+    const CYCLES_PER_FRAME: u16 = 10;
 
     pub fn run(&mut self, rom: &[u8]) {
         self.cpu.load_rom(rom);
@@ -71,7 +71,7 @@ impl<T: SoundOutput> Emulator<T> {
                 break;
             }
 
-            for _ in 0..(Emulator::<T>::TICKS_PER_SEC / Emulator::<T>::FRAMES_PER_SEC as u16) {
+            for _ in 0..Emulator::<T>::CYCLES_PER_FRAME {
                 self.cpu.tick(&self.input);
                 if self.cpu.sound_active() {
                     self.sound.beep();
