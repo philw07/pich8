@@ -2,7 +2,10 @@ use super::*;
 use crate::contracts::DisplayOutput;
 
 struct DisplayMock{}
-impl DisplayOutput for DisplayMock { fn draw(&mut self, _buffer: &BitArray<Msb0, [u64; 32]>) {} }
+impl DisplayOutput for DisplayMock {
+    fn draw(&mut self, _buffer: &BitArray<Msb0, [u64; 32]>) -> Result<(), String> {Ok(())}
+    fn toggle_fullscreen(&mut self) -> Result<(), String> {Ok(())}
+}
 
 #[test]
 fn test_initial_state() {
@@ -11,7 +14,7 @@ fn test_initial_state() {
     assert_eq!(cpu.mem.len(), 4096);
     assert_eq!(cpu.vmem.len(), 64*32);
     assert_eq!(cpu.stack, [0; 16]);
-    assert_eq!(cpu.keys, [false; 16]);
+    assert_eq!(cpu.keys, bitarr![Msb0, u16; 0; 16]);
     
     assert_eq!(cpu.V, [0; 16]);
     assert_eq!(cpu.I, 0);
@@ -26,12 +29,12 @@ fn test_initial_state() {
 }
 
 #[test]
-fn test_load() {
+fn test_load_rom() {
     let mut cpu = CPU::new();
     cpu.PC = 0x123;
 
     let prog: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF, 0, 0xF];
-    cpu.load(prog);
+    cpu.load_rom(prog);
 
     assert_eq!(&cpu.mem[0x200..0x200+prog.len()], prog);
     assert_eq!(&cpu.mem[0x200+prog.len()..], &[0; 4096][0x200+prog.len()..]);
@@ -42,7 +45,7 @@ fn test_load() {
 fn test_opcodes() {
     // 0x00E0
     let mut cpu = CPU::new();
-    cpu.load(&[0x00, 0xE0]);
+    cpu.load_rom(&[0x00, 0xE0]);
     cpu.vmem = bitarr![Msb0, u64; 1; 64*32];
     cpu.emulate_cycle();
     for i in 0..64 {
@@ -53,7 +56,7 @@ fn test_opcodes() {
 
     // 0x00EE
     cpu = CPU::new();
-    cpu.load(&[0x00, 0x00, 0x00, 0x00, 0x00, 0xEE]);
+    cpu.load_rom(&[0x00, 0x00, 0x00, 0x00, 0x00, 0xEE]);
     cpu.PC = 0x204;
     cpu.stack[0] = 0x200;
     cpu.sp = 1;
@@ -63,14 +66,14 @@ fn test_opcodes() {
 
     // 0x1NNN
     cpu = CPU::new();
-    cpu.load(&[0x12, 0xB0]);
+    cpu.load_rom(&[0x12, 0xB0]);
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x2B0);
     assert_eq!(cpu.sp, 0);
 
     // 0x2NNN
     cpu = CPU::new();
-    cpu.load(&[0x22, 0xB0]);
+    cpu.load_rom(&[0x22, 0xB0]);
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x2B0);
     assert_eq!(cpu.sp, 1);
@@ -78,40 +81,40 @@ fn test_opcodes() {
     
     // 0x3XNN - Equal
     cpu = CPU::new();
-    cpu.load(&[0x30, 0x12]);
+    cpu.load_rom(&[0x30, 0x12]);
     cpu.V[0] = 0x12;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x204);
     // 0x3XNN - Not equal
     cpu = CPU::new();
-    cpu.load(&[0x30, 0x12]);
+    cpu.load_rom(&[0x30, 0x12]);
     cpu.V[0] = 0x21;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x202);
 
     // 0x4XNN - Equal
     cpu = CPU::new();
-    cpu.load(&[0x40, 0x12]);
+    cpu.load_rom(&[0x40, 0x12]);
     cpu.V[0] = 0x12;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x202);
     // 0x4XNN - Not equal
     cpu = CPU::new();
-    cpu.load(&[0x40, 0x12]);
+    cpu.load_rom(&[0x40, 0x12]);
     cpu.V[0] = 0x21;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x204);
 
     // 0x5XY0 - Equal
     cpu = CPU::new();
-    cpu.load(&[0x50, 0x10]);
+    cpu.load_rom(&[0x50, 0x10]);
     cpu.V[0] = 0x12;
     cpu.V[1] = 0x12;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x204);
     // 0x5XY0 - Not equal
     cpu = CPU::new();
-    cpu.load(&[0x50, 0x10]);
+    cpu.load_rom(&[0x50, 0x10]);
     cpu.V[0] = 0x21;
     cpu.V[1] = 0x12;
     cpu.emulate_cycle();
@@ -125,14 +128,14 @@ fn test_opcodes() {
 
     // 0x9XY0 - Equal
     cpu = CPU::new();
-    cpu.load(&[0x90, 0x10]);
+    cpu.load_rom(&[0x90, 0x10]);
     cpu.V[0] = 0x12;
     cpu.V[1] = 0x12;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x202);
     // 0x9XY0 - Not equal
     cpu = CPU::new();
-    cpu.load(&[0x90, 0x10]);
+    cpu.load_rom(&[0x90, 0x10]);
     cpu.V[0] = 0x21;
     cpu.V[1] = 0x12;
     cpu.emulate_cycle();
@@ -140,34 +143,34 @@ fn test_opcodes() {
 
     // 0xANNN
     cpu = CPU::new();
-    cpu.load(&[0xA1, 0x23]);
+    cpu.load_rom(&[0xA1, 0x23]);
     cpu.emulate_cycle();
     assert_eq!(cpu.I, 0x123);
     assert_eq!(cpu.PC, 0x202);
 
     // 0xBNNN
     cpu = CPU::new();
-    cpu.load(&[0xB1, 0x23]);
+    cpu.load_rom(&[0xB1, 0x23]);
     cpu.V[0] = 0x11;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x134);
 
     // 0xCNNN
     cpu = CPU::new();
-    cpu.load(&[0xC0, 0x00]);
+    cpu.load_rom(&[0xC0, 0x00]);
     cpu.emulate_cycle();
     assert_eq!(cpu.V[0], 0);
-    cpu.load(&[0xC0, 0x0F]);
+    cpu.load_rom(&[0xC0, 0x0F]);
     cpu.emulate_cycle();
     assert_eq!(cpu.V[0] & 0xF0, 0);
-    cpu.load(&[0xC0, 0xF0]);
+    cpu.load_rom(&[0xC0, 0xF0]);
     cpu.emulate_cycle();
     assert_eq!(cpu.V[0] & 0x0F, 0);
     assert_eq!(cpu.PC, 0x202);
 
     // 0xDXYN - No wrapping
     cpu = CPU::new();
-    cpu.load(&[0xD0, 0x15]);
+    cpu.load_rom(&[0xD0, 0x15]);
     cpu.V[0] = 7;
     cpu.V[1] = 2;
     cpu.I = 0x300;
@@ -182,7 +185,7 @@ fn test_opcodes() {
     assert_eq!(cpu.PC, 0x202);
     // 0xDXYN - Wrapping x and y
     cpu = CPU::new();
-    cpu.load(&[0xD0, 0x15]);
+    cpu.load_rom(&[0xD0, 0x15]);
     cpu.V[0] = 60;
     cpu.V[1] = 30;
     cpu.I = 0x300;
@@ -201,7 +204,7 @@ fn test_opcodes() {
     // 0xDXYN - Vertical wrapping disabled
     cpu = CPU::new();
     cpu.vertical_wrapping = false;
-    cpu.load(&[0xD0, 0x15]);
+    cpu.load_rom(&[0xD0, 0x15]);
     cpu.V[0] = 60;
     cpu.V[1] = 30;
     cpu.I = 0x300;
@@ -222,7 +225,7 @@ fn test_opcodes() {
     assert_eq!(cpu.PC, 0x202);
     // 0xDXYN - Collision
     cpu = CPU::new();
-    cpu.load(&[0xD0, 0x15]);
+    cpu.load_rom(&[0xD0, 0x15]);
     cpu.V[0] = 7;
     cpu.V[1] = 2;
     cpu.I = 0x300;
@@ -241,37 +244,37 @@ fn test_opcodes() {
 
     // 0xEX9E - Pressed
     cpu = CPU::new();
-    cpu.load(&[0xE0, 0x9E]);
-    cpu.keys[3] = true;
+    cpu.load_rom(&[0xE0, 0x9E]);
+    cpu.keys.set(3, true);
     cpu.V[0] = 3;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x204);
     // 0xEX9E - Not pressed
     cpu = CPU::new();
-    cpu.load(&[0xE0, 0x9E]);
-    cpu.keys[3] = false;
+    cpu.load_rom(&[0xE0, 0x9E]);
+    cpu.keys.set(3, false);
     cpu.V[0] = 3;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x202);
 
     // 0xEXA1 - Pressed
     cpu = CPU::new();
-    cpu.load(&[0xE0, 0xA1]);
-    cpu.keys[3] = true;
+    cpu.load_rom(&[0xE0, 0xA1]);
+    cpu.keys.set(3, true);
     cpu.V[0] = 3;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x202);
     // 0xEXA1 - Not pressed
     cpu = CPU::new();
-    cpu.load(&[0xE0, 0xA1]);
-    cpu.keys[3] = false;
+    cpu.load_rom(&[0xE0, 0xA1]);
+    cpu.keys.set(3,false );
     cpu.V[0] = 3;
     cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x204);
 
     // 0xFX07
     cpu = CPU::new();
-    cpu.load(&[0xF0, 0x07]);
+    cpu.load_rom(&[0xF0, 0x07]);
     cpu.DT = 0xAB;
     cpu.emulate_cycle();
     assert_eq!(cpu.V[0], cpu.DT);
@@ -279,28 +282,28 @@ fn test_opcodes() {
     
     // 0xFX0A
     cpu = CPU::new();
-    cpu.load(&[0xF5, 0x0A]);
+    cpu.load_rom(&[0xF5, 0x0A]);
     cpu.emulate_cycle();
     assert_eq!(cpu.key_wait, true);
     assert_eq!(cpu.key_reg, 5);
 
     // 0xFX15
     cpu = CPU::new();
-    cpu.load(&[0xF0, 0x15]);
+    cpu.load_rom(&[0xF0, 0x15]);
     cpu.V[0] = 0x15;
     cpu.emulate_cycle();
     assert_eq!(cpu.DT, 0x15);
 
     // 0xFX18
     cpu = CPU::new();
-    cpu.load(&[0xF0, 0x18]);
+    cpu.load_rom(&[0xF0, 0x18]);
     cpu.V[0] = 0x15;
     cpu.emulate_cycle();
     assert_eq!(cpu.ST, 0x15);
 
     // 0xFX1E
     cpu = CPU::new();
-    cpu.load(&[0xF0, 0x1E]);
+    cpu.load_rom(&[0xF0, 0x1E]);
     cpu.V[0] = 0x02;
     cpu.I = 0xAB;
     cpu.emulate_cycle();
@@ -309,7 +312,7 @@ fn test_opcodes() {
 
     // 0xFX29
     cpu = CPU::new();
-    cpu.load(&[0xF0, 0x29]);
+    cpu.load_rom(&[0xF0, 0x29]);
     for i in 0..=0xF {
         cpu.V[0] = i;
         cpu.emulate_cycle();
@@ -319,7 +322,7 @@ fn test_opcodes() {
 
     // 0xFX33
     cpu = CPU::new();
-    cpu.load(&[0xF0, 0x33]);
+    cpu.load_rom(&[0xF0, 0x33]);
     cpu.I = 0x300;
     cpu.V[0] = 194;
     cpu.emulate_cycle();
@@ -330,7 +333,7 @@ fn test_opcodes() {
     // 0xFX55 - Quirk
     let reg: &[u8] = &[0x12, 0x34, 0x56, 0x78, 0x9A, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     cpu = CPU::new();
-    cpu.load(&[0xF5, 0x55]);
+    cpu.load_rom(&[0xF5, 0x55]);
     cpu.I = 0x300;
     cpu.V.copy_from_slice(&reg);
     cpu.emulate_cycle();
@@ -341,7 +344,7 @@ fn test_opcodes() {
     // 0xFX55 - No quirk
     let reg: &[u8] = &[0x12, 0x34, 0x56, 0x78, 0x9A, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     cpu = CPU::new();
-    cpu.load(&[0xF5, 0x55]);
+    cpu.load_rom(&[0xF5, 0x55]);
     cpu.I = 0x300;
     cpu.V.copy_from_slice(&reg);
     cpu.quirk_load_store = false;
@@ -354,7 +357,7 @@ fn test_opcodes() {
     // 0xFX65 - Quirk
     let prog = &[0xF5, 0x65, 0xA9, 0x87, 0x65, 0x43, 0x21, 0xFF];
     cpu = CPU::new();
-    cpu.load(prog);
+    cpu.load_rom(prog);
     cpu.I = 0x202;
     cpu.emulate_cycle();
     assert_eq!(&cpu.V[..=5], &prog[2..=7]);
@@ -364,7 +367,7 @@ fn test_opcodes() {
     // 0xFX65 - No quirk
     let prog = &[0xF5, 0x65, 0xA9, 0x87, 0x65, 0x43, 0x21, 0xFF];
     cpu = CPU::new();
-    cpu.load(prog);
+    cpu.load_rom(prog);
     cpu.I = 0x202;
     cpu.quirk_load_store = false;
     cpu.emulate_cycle();
@@ -376,7 +379,7 @@ fn test_opcodes() {
 
 fn test_arithmetic(opcode: u16, v1: u8, v2: u8, res: u8, resv: Option<u8>) {
     let mut cpu = CPU::new();
-    cpu.load(&[(opcode >> 8) as u8, opcode as u8]);
+    cpu.load_rom(&[(opcode >> 8) as u8, opcode as u8]);
     cpu.V[0] = v1;
     cpu.V[1] = v2;
     cpu.emulate_cycle();
@@ -400,7 +403,7 @@ fn test_arithmetic_8_noquirk(code: u8, v1: u8, v2: u8, res: u8, resv: Option<u8>
     let mut cpu = CPU::new();
     cpu.quirk_load_store = false;
     cpu.quirk_shift = false;
-    cpu.load(&[(opcode >> 8) as u8, opcode as u8]);
+    cpu.load_rom(&[(opcode >> 8) as u8, opcode as u8]);
     cpu.V[0] = v1;
     cpu.V[1] = v2;
     cpu.emulate_cycle();
@@ -460,7 +463,7 @@ fn test_opcodes_arithmetic() {
 
 fn test_invalid_opcode(opcode: u16) {
     let mut cpu = CPU::new();
-    cpu.load(&[(opcode >> 8) as u8, opcode as u8]);
+    cpu.load_rom(&[(opcode >> 8) as u8, opcode as u8]);
     cpu.emulate_cycle();
 }
 
