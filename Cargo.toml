@@ -14,3 +14,6 @@ serde = { version = "1.0.117", features = ["derive"] }
 rmp-serde = "0.14.4"
 sdl2 = "0.34.3"
 spin_sleep = "1.0.0"
+
+[features]
+static-link = ["sdl2/static-link"]
