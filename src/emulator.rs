@@ -3,7 +3,7 @@ use crate::display::WindowDisplay;
 use crate::contracts::{DisplayOutput, SoundOutput};
 use crate::sound::{NoSound, BeepSound};
 use bitvec::prelude::*;
-use std::thread::sleep;
+use spin_sleep::sleep;
 use std::time::{Duration, Instant};
 use sdl2::{
     EventPump,
