@@ -16,7 +16,6 @@ pub struct Emulator<T: SoundOutput> {
     display: WindowDisplay,
     sound: T,
     input: BitArray<Msb0, [u16; 1]>,
-    last_tick: Instant,
     event_pump: EventPump,
 }
 
@@ -25,10 +24,9 @@ impl Emulator<BeepSound> {
         let sdl_context = sdl2::init().unwrap();
         Ok(Self{
             cpu: CPU::new(),
-            display: WindowDisplay::new(&sdl_context)?,
+            display: WindowDisplay::new(&sdl_context, true)?,
             sound: BeepSound::new(&sdl_context)?,
             input: bitarr![Msb0, u16; 0; 16],
-            last_tick: Instant::now(),
             event_pump: sdl_context.event_pump()?,
         })
     }
@@ -39,18 +37,18 @@ impl Emulator<NoSound> {
         let sdl_context = sdl2::init().unwrap();
         Ok(Self{
             cpu: CPU::new(),
-            display: WindowDisplay::new(&sdl_context)?,
+            display: WindowDisplay::new(&sdl_context, true)?,
             sound: NoSound{},
             input: bitarr![Msb0, u16; 0; 16],
-            last_tick: Instant::now(),
             event_pump: sdl_context.event_pump()?,
         })
     }
 }
 
 impl<T: SoundOutput> Emulator<T> {
-    const FRAMES_PER_SEC: f64 = 60.0;
+    const FRAMES_PER_SEC: u64 = 60;
     const CYCLES_PER_FRAME: u16 = 10;
+    const NANOS_PER_FRAME: u64 = 1_000_000_000 / Emulator::<T>::FRAMES_PER_SEC;
 
     pub fn run(&mut self, rom: &[u8]) {
         self.cpu.load_rom(rom);
@@ -65,7 +63,7 @@ impl<T: SoundOutput> Emulator<T> {
 
     fn run_loop(&mut self) {
         loop {
-            self.last_tick = Instant::now();
+            let frame_start = Instant::now();
 
             if self.handle_events() {
                 break;
@@ -79,8 +77,15 @@ impl<T: SoundOutput> Emulator<T> {
             }
             self.cpu.update_timers();
             self.display.draw(self.cpu.vmem()).expect("failed to render frame");
-            
-            self.sleep();
+
+            self.sleep(&frame_start);
+        }
+    }
+
+    fn sleep(&mut self, frame_start: &Instant) {
+        let sleep_time = Emulator::<T>::NANOS_PER_FRAME as f64 - frame_start.elapsed().as_nanos() as f64;
+        if sleep_time > 0.0 {
+            sleep(Duration::from_nanos(sleep_time as u64));
         }
     }
 
@@ -128,13 +133,5 @@ impl<T: SoundOutput> Emulator<T> {
             }
         }
         false
-    }
-
-    fn sleep(&mut self) {
-        let elapsed = self.last_tick.elapsed().as_nanos() as f64;
-        let sleep_time = (1_000_000_000.0 / Emulator::<T>::FRAMES_PER_SEC) - elapsed;
-        if sleep_time > 0.0 {
-            sleep(Duration::from_nanos(sleep_time as u64));
-        }
     }
 }

@@ -58,18 +58,21 @@ impl WindowDisplay {
     const C8_WIDTH: u32 = 64;
     const C8_HEIGHT: u32 = 32;
 
-    pub fn new(sdl_context: &Sdl) -> Result<Self, String> {
-        let window = sdl_context
-            .video()?
+    pub fn new(sdl_context: &Sdl, vsync: bool) -> Result<Self, String> {
+        let window = sdl_context.video()?
             .window(WindowDisplay::WINDOW_NAME, WindowDisplay::WINDOW_WIDTH, WindowDisplay::WINDOW_HEIGHT)
             .position_centered()
             .resizable()
             .opengl()
             .build().map_err(|e| format!("couldn't setup window: {}", e))?;
-        let canvas = window.into_canvas().build().map_err(|e| format!("couldn't setup canvas: {}", e))?;
+        let mut canvas_builder = window.into_canvas();
+        if vsync {
+            canvas_builder = canvas_builder.present_vsync();
+        }
+        let canvas = canvas_builder.build().map_err(|e| format!("couldn't setup canvas: {}", e))?;
 
         Ok(Self{
-            canvas: canvas,
+            canvas,
             bg_color: WindowDisplay::BG_COLOR,
             fg_color: WindowDisplay::FG_COLOR,
             mouse: sdl_context.mouse(),
