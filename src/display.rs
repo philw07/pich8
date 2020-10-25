@@ -29,11 +29,13 @@ impl DisplayOutput for WindowDisplay {
         // Draw frame
         let (width, height) = self.canvas.output_size()?;
         let scale_w = width / WindowDisplay::C8_WIDTH;
+        let offset_x = (width - WindowDisplay::C8_WIDTH * scale_w) as i32 / 2;
         let scale_h = height / WindowDisplay::C8_HEIGHT;
+        let offset_y = (height - WindowDisplay::C8_HEIGHT * scale_h) as i32 / 2;
         for y in 0..32 {
             for x in 0..64 {
                 self.canvas.set_draw_color(if buffer[self.get_index(x, y)] { self.fg_color } else { self.bg_color });
-                self.canvas.fill_rect(Rect::new(scale_w as i32 * x as i32, scale_h as i32 * y as i32, scale_w, scale_h))?;
+                self.canvas.fill_rect(Rect::new(offset_x + scale_w as i32 * x as i32, offset_y + scale_h as i32 * y as i32, scale_w, scale_h))?;
             }
         }
 
