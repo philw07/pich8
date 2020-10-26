@@ -66,6 +66,7 @@ impl WindowDisplay {
             .position_centered()
             .resizable()
             .opengl()
+            .allow_highdpi()
             .build().map_err(|e| format!("couldn't setup window: {}", e))?;
         let mut canvas_builder = window.into_canvas();
         if vsync {
