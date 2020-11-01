@@ -1,137 +1,334 @@
+use crate::contracts::SoundOutput;
 use crate::cpu::CPU;
 use crate::display::WindowDisplay;
-use crate::contracts::{DisplayOutput, SoundOutput};
-use crate::sound::{NoSound, BeepSound};
+use crate::gui::GUI;
+use crate::sound::NoSound;
+use crate::file_dialog_handler::{FileDialogHandler, FileDialogResult, FileDialogType};
+use std::{time::Instant, fs};
 use bitvec::prelude::*;
-use spin_sleep::sleep;
-use std::time::{Duration, Instant};
-use sdl2::{
-    EventPump,
-    event::Event,
-    keyboard::Keycode,
+use glium::{
+    glutin::{
+        event_loop::{
+            EventLoop,
+            ControlFlow,
+        },
+        event::{
+            Event,
+            WindowEvent,
+            KeyboardInput,
+            VirtualKeyCode,
+            ElementState,
+        },
+    },
 };
+
+enum LoadedType {
+    Nothing,
+    Rom(Vec<u8>),
+    State(Vec<u8>),
+}
 
 pub struct Emulator<T: SoundOutput> {
     cpu: CPU,
+    cpu_speed: u16,
     display: WindowDisplay,
+    gui: GUI,
     sound: T,
+    mute: bool,
     input: BitArray<Msb0, [u16; 1]>,
-    event_pump: EventPump,
+    loaded: LoadedType,
+    pause: bool,
+    frame_time: Instant,
+    last_timer: Instant,
+    last_cycle: Instant,
+    pause_time: Instant,
+    file_dialog: FileDialogHandler,
 }
 
-impl Emulator<BeepSound> {
-    pub fn new() -> Result<Self, String> {
-        let sdl_context = sdl2::init().unwrap();
-        Ok(Self{
-            cpu: CPU::new(),
-            display: WindowDisplay::new(&sdl_context, true)?,
-            sound: BeepSound::new(&sdl_context)?,
-            input: bitarr![Msb0, u16; 0; 16],
-            event_pump: sdl_context.event_pump()?,
-        })
-    }
-}
+// impl Emulator<BeepSound> {
+//     pub fn new() -> Result<Self, String> {
+//         let event_loop = EventLoop::new();
+//         Ok(Self{
+//             cpu: CPU::new(),
+//             display: WindowDisplay::new(&event_loop, true)?,
+//             sound: BeepSound::new(&sdl_context)?,
+//             input: bitarr![Msb0, u16; 0; 16],
+//             event_loop,
+//         })
+//     }
+// }
 
 impl Emulator<NoSound> {
-    pub fn new_without_sound() -> Result<Self, String> {
-        let sdl_context = sdl2::init().unwrap();
+    pub fn new_without_sound(event_loop: &EventLoop<()>) -> Result<Self, String> {
+        let display = WindowDisplay::new(&event_loop, false)?;
+        let cpu = CPU::new();
+        let cpu_speed = Emulator::<NoSound>::CPU_FREQUENCY;
+
+        // Initialize GUI
+        let mut gui = GUI::new(display.display());
+        gui.set_flag_quirk_load_store(cpu.quirk_load_store());
+        gui.set_flag_quirk_shift(cpu.quirk_shift());
+        gui.set_flag_vertical_wrapping(cpu.vertical_wrapping());
+        gui.set_cpu_speed(cpu_speed);
+
+        let bg_color = display.bg_color();
+        gui.set_bg_color([
+            bg_color[0] as f32 / 255.0,
+            bg_color[1] as f32 / 255.0,
+            bg_color[2] as f32 / 255.0
+        ]);
+        let fg_color = display.fg_color();
+        gui.set_fg_color([
+            fg_color[0] as f32 / 255.0,
+            fg_color[1] as f32 / 255.0,
+            fg_color[2] as f32 / 255.0
+        ]);
+
+        let now = Instant::now();
         Ok(Self{
-            cpu: CPU::new(),
-            display: WindowDisplay::new(&sdl_context, true)?,
+            cpu,
+            cpu_speed,
+            display,
+            gui,
             sound: NoSound{},
+            mute: false,
             input: bitarr![Msb0, u16; 0; 16],
-            event_pump: sdl_context.event_pump()?,
+            loaded: LoadedType::Nothing,
+            pause: false,
+            frame_time: now,
+            last_timer: now,
+            last_cycle: now,
+            pause_time: now,
+            file_dialog: FileDialogHandler::new(),
         })
     }
 }
 
 impl<T: SoundOutput> Emulator<T> {
-    const FRAMES_PER_SEC: u64 = 60;
-    const CYCLES_PER_FRAME: u16 = 10;
-    const NANOS_PER_FRAME: u64 = 1_000_000_000 / Emulator::<T>::FRAMES_PER_SEC;
+    const CPU_FREQUENCY: u16 = 720;
+    const TIMER_FREQUENCY: u8 = 60;
+    const NANOS_PER_TIMER: u64 = 1_000_000_000 / Emulator::<T>::TIMER_FREQUENCY as u64;
 
-    pub fn run(&mut self, rom: &[u8]) {
-        self.cpu.load_rom(rom);
-        self.run_loop();
-    }
-
-    pub fn run_state(&mut self, state: &[u8]) -> Result<(), String> {
-        self.cpu = CPU::from_state(state).map_err(|e| format!("error loading state: {}", e))?;
-        self.run_loop();
-        Ok(())
-    }
-
-    fn run_loop(&mut self) {
-        loop {
-            let frame_start = Instant::now();
-
-            if self.handle_events() {
-                break;
-            }
-
-            for _ in 0..Emulator::<T>::CYCLES_PER_FRAME {
-                self.cpu.tick(&self.input);
-                if self.cpu.sound_active() {
-                    self.sound.beep();
-                }
-            }
-            self.cpu.update_timers();
-            self.display.draw(self.cpu.vmem()).expect("failed to render frame");
-
-            self.sleep(&frame_start);
+    fn reset(&mut self) {
+        match &self.loaded {
+            LoadedType::Rom(rom) => {
+                self.cpu = CPU::new();
+                self.cpu.load_rom(&rom);
+            },
+            LoadedType::State(state) => {
+                self.cpu = CPU::from_state(&state).expect("Failed to load state");
+            },
+            _ => (),
         }
     }
 
-    fn sleep(&mut self, frame_start: &Instant) {
-        let sleep_time = Emulator::<T>::NANOS_PER_FRAME as f64 - frame_start.elapsed().as_nanos() as f64;
-        if sleep_time > 0.0 {
-            sleep(Duration::from_nanos(sleep_time as u64));
+    pub fn load_rom(&mut self, rom: &[u8]) {
+        self.loaded = LoadedType::Rom(rom.to_vec());
+        self.reset();
+    }
+
+    pub fn load_state(&mut self, state: &[u8]) {
+        self.loaded = LoadedType::State(state.to_vec());
+        self.reset();
+    }
+
+    fn set_pause(&mut self, pause: bool) {
+        self.pause = pause;
+        if pause {
+            // Store timestamp
+            self.pause_time = Instant::now();
+        } else {
+            // "Subtract" paused time so the simulation doesn't jump
+            let diff = Instant::now() - self.pause_time;
+            self.last_cycle += diff;
         }
     }
 
-    fn handle_events(&mut self) -> bool {
-        for event in self.event_pump.poll_iter() {
+    pub fn handle_event(&mut self, event: Event<()>, ctrl_flow: &mut ControlFlow) {
+        // Handle file dialogs
+        if self.file_dialog.is_open() && self.file_dialog.check_result() {
+            match self.file_dialog.last_result() {
+                FileDialogResult::OpenRom(file_path) => {
+                    if let Ok(file) = fs::read(&file_path) {
+                        self.load_rom(&file);
+                    }
+                },
+                FileDialogResult::LoadState(file_path) => {
+                    if let Ok(file) = fs::read(&file_path) {
+                        self.load_state(&file);
+                    }
+                },
+                FileDialogResult::SaveState(file_path) => {
+                    let state = self.cpu.save_state().expect("Failed to save state");
+                    fs::write(file_path, state).expect("Failed to write file");
+                },
+                FileDialogResult::None => (),
+            }
+        }
+
+        // Handle events
+        if !self.file_dialog.is_open() {
+            self.gui.handle_event(self.display.display(), &event);
             match event {
-                Event::Quit{..} => return true,
-                Event::KeyDown{ keycode: Some(Keycode::Escape), .. } => return true,
-                Event::KeyDown{ keycode: Some(Keycode::F11), .. } => { self.display.toggle_fullscreen().unwrap(); },
+                Event::NewEvents(_) => {
+                    self.handle_gui_flags(ctrl_flow);
+                },
+                Event::MainEventsCleared => {
+                    if !self.pause {
+                        // Perform 
+                        let nanos_per_cycle = 1_000_000_000 / self.cpu_speed as u64;
+                        if self.last_cycle.elapsed().as_nanos() as u64 >= nanos_per_cycle * 10 {
+                            let cycles = (self.last_cycle.elapsed().as_nanos() as f64 / nanos_per_cycle as f64) as u64;
+                            self.last_cycle = Instant::now();
+                            for _ in 0..cycles {
+                                self.cpu.tick(&self.input);
+                                if self.cpu.sound_active() && !self.mute {
+                                    self.sound.beep();
+                                }
+                            }
+                        }
+                        // Update CPU timers
+                        if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::<T>::NANOS_PER_TIMER {
+                            self.last_timer = Instant::now();
+                            self.cpu.update_timers();
+                        }
+                    }
 
-                // Chip8 Keys
-                Event::KeyDown{ keycode: Some(Keycode::Num1), .. } => self.input.set(0, true),
-                Event::KeyDown{ keycode: Some(Keycode::Num2), .. } => self.input.set(1, true),
-                Event::KeyDown{ keycode: Some(Keycode::Num3), .. } => self.input.set(2, true),
-                Event::KeyDown{ keycode: Some(Keycode::Num4), .. } => self.input.set(3, true),
-                Event::KeyDown{ keycode: Some(Keycode::Q), .. } => self.input.set(4, true),
-                Event::KeyDown{ keycode: Some(Keycode::W), .. } => self.input.set(5, true),
-                Event::KeyDown{ keycode: Some(Keycode::E), .. } => self.input.set(6, true),
-                Event::KeyDown{ keycode: Some(Keycode::R), .. } => self.input.set(7, true),
-                Event::KeyDown{ keycode: Some(Keycode::A), .. } => self.input.set(8, true),
-                Event::KeyDown{ keycode: Some(Keycode::S), .. } => self.input.set(9, true),
-                Event::KeyDown{ keycode: Some(Keycode::D), .. } => self.input.set(10, true),
-                Event::KeyDown{ keycode: Some(Keycode::F), .. } => self.input.set(11, true),
-                Event::KeyDown{ keycode: Some(Keycode::Y), .. } => self.input.set(12, true),
-                Event::KeyDown{ keycode: Some(Keycode::X), .. } => self.input.set(13, true),
-                Event::KeyDown{ keycode: Some(Keycode::C), .. } => self.input.set(14, true),
-                Event::KeyDown{ keycode: Some(Keycode::V), .. } => self.input.set(15, true),
-                Event::KeyUp{ keycode: Some(Keycode::Num1), .. } => self.input.set(0, false),
-                Event::KeyUp{ keycode: Some(Keycode::Num2), .. } => self.input.set(1, false),
-                Event::KeyUp{ keycode: Some(Keycode::Num3), .. } => self.input.set(2, false),
-                Event::KeyUp{ keycode: Some(Keycode::Num4), .. } => self.input.set(3, false),
-                Event::KeyUp{ keycode: Some(Keycode::Q), .. } => self.input.set(4, false),
-                Event::KeyUp{ keycode: Some(Keycode::W), .. } => self.input.set(5, false),
-                Event::KeyUp{ keycode: Some(Keycode::E), .. } => self.input.set(6, false),
-                Event::KeyUp{ keycode: Some(Keycode::R), .. } => self.input.set(7, false),
-                Event::KeyUp{ keycode: Some(Keycode::A), .. } => self.input.set(8, false),
-                Event::KeyUp{ keycode: Some(Keycode::S), .. } => self.input.set(9, false),
-                Event::KeyUp{ keycode: Some(Keycode::D), .. } => self.input.set(10, false),
-                Event::KeyUp{ keycode: Some(Keycode::F), .. } => self.input.set(11, false),
-                Event::KeyUp{ keycode: Some(Keycode::Y), .. } => self.input.set(12, false),
-                Event::KeyUp{ keycode: Some(Keycode::X), .. } => self.input.set(13, false),
-                Event::KeyUp{ keycode: Some(Keycode::C), .. } => self.input.set(14, false),
-                Event::KeyUp{ keycode: Some(Keycode::V), .. } => self.input.set(15, false),
-                _ => {}
+                    // Always request redrawing to keep the GUI updated
+                    self.display.display().gl_window().window().request_redraw();
+                },
+                Event::RedrawRequested(_) => {
+                    let frame_duration = Instant::now() - self.frame_time;
+                    self.frame_time = Instant::now();
+
+                    let is_fullscreen = self.display.fullscreen();
+                    let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
+                    let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to render frame");
+                    if !is_fullscreen {
+                        self.gui.render(frame_duration, self.display.display(), &mut frame).expect("Failed to render GUI");
+                    }
+                    self.display.render(frame).expect("Faield to render frame");
+                },
+                Event::WindowEvent{ event: WindowEvent::KeyboardInput { input: KeyboardInput{ scancode, virtual_keycode: Some(keycode), state, .. }, .. }, .. } => self.handle_input(scancode, keycode, state, ctrl_flow),
+                Event::WindowEvent{ event: WindowEvent::CloseRequested, .. } => *ctrl_flow = ControlFlow::Exit,
+                _ => (),
             }
         }
-        false
+    }
+
+    #[inline]
+    fn handle_gui_flags(&mut self, ctrl_flow: &mut ControlFlow) {
+        let fullscreen = self.display.fullscreen();
+        let mut pause = false;
+
+        if self.gui.menu_open() && !fullscreen {
+            // Pause emulation while menu is open
+            pause = true;
+        }
+
+        if self.gui.flag_open_rom() {
+            self.file_dialog.open_dialog(FileDialogType::OpenRom);
+            self.gui.set_flag_open_rom(false);
+        }
+        if self.gui.flag_load_state() {
+            self.file_dialog.open_dialog(FileDialogType::LoadState);
+            self.gui.set_flag_load_state(false);
+        }
+        if self.gui.flag_save_state() {
+            self.file_dialog.open_dialog(FileDialogType::SaveState);
+            self.gui.set_flag_save_state(false);
+        }
+        if self.gui.flag_reset() {
+            self.reset();
+            self.gui.set_flag_reset(false);
+        }
+        if self.gui.flag_exit() {
+            *ctrl_flow = ControlFlow::Exit;
+            self.gui.set_flag_exit(false);
+        }
+        if self.gui.flag_fullscreen() != fullscreen {
+            let _ = self.display.toggle_fullscreen();
+        }
+        if self.gui.flag_pause() {
+            pause = true;
+        }
+
+        let bg_color = self.gui.bg_color();
+        self.display.set_bg_color([
+            (bg_color[0] * 255.0) as u8,
+            (bg_color[1] * 255.0) as u8,
+            (bg_color[2] * 255.0) as u8
+        ]);
+        let fg_color = self.gui.fg_color();
+        self.display.set_fg_color([
+            (fg_color[0] * 255.0) as u8,
+            (fg_color[1] * 255.0) as u8,
+            (fg_color[2] * 255.0) as u8
+        ]);
+
+        self.cpu_speed = self.gui.cpu_speed();
+        self.cpu.set_quirk_load_store(self.gui.flag_quirk_load_store());
+        self.cpu.set_quirk_shift(self.gui.flag_quirk_shift());
+        self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
+        self.mute = self.gui.flag_mute();
+
+        if pause != self.pause {
+            self.set_pause(pause);
+        }
+    }
+
+    #[inline]
+    fn handle_input(&mut self, scancode: u32, keycode: VirtualKeyCode, state: ElementState, ctrl_flow: &mut ControlFlow) {
+        use VirtualKeyCode::*;
+        use ElementState::*;
+        match (scancode, keycode, state) {
+            // Command keys
+            (_, Escape, Pressed) => {
+                if self.gui.flag_fullscreen() {
+                    self.gui.set_flag_fullscreen(false);
+                } else {
+                    *ctrl_flow = ControlFlow::Exit;
+                }
+            },
+            (_, F11, Pressed) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
+            (_, P, Pressed) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
+            (_, M, Pressed) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
+
+            // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
+            (2, _, Pressed)     => self.input.set(0, true),
+            (2, _, Released)    => self.input.set(0, false),
+            (3, _, Pressed)     => self.input.set(1, true),
+            (3, _, Released)    => self.input.set(1, false),
+            (4, _, Pressed)     => self.input.set(2, true),
+            (4, _, Released)    => self.input.set(2, false),
+            (5, _, Pressed)     => self.input.set(3, true),
+            (5, _, Released)    => self.input.set(3, false),
+            (16, _, Pressed)    => self.input.set(4, true),
+            (16, _, Released)   => self.input.set(4, false),
+            (17, _, Pressed)    => self.input.set(5, true),
+            (17, _, Released)   => self.input.set(5, false),
+            (18, _, Pressed)    => self.input.set(6, true),
+            (18, _, Released)   => self.input.set(6, false),
+            (19, _, Pressed)    => self.input.set(7, true),
+            (19, _, Released)   => self.input.set(7, false),
+            (30, _, Pressed)    => self.input.set(8, true),
+            (30, _, Released)   => self.input.set(8, false),
+            (31, _, Pressed)    => self.input.set(9, true),
+            (31, _, Released)   => self.input.set(9, false),
+            (32, _, Pressed)    => self.input.set(10, true),
+            (32, _, Released)   => self.input.set(10, false),
+            (33, _, Pressed)    => self.input.set(11, true),
+            (33, _, Released)   => self.input.set(11, false),
+            (44, _, Pressed)    => self.input.set(12, true),
+            (44, _, Released)   => self.input.set(12, false),
+            (45, _, Pressed)    => self.input.set(13, true),
+            (45, _, Released)   => self.input.set(13, false),
+            (46, _, Pressed)    => self.input.set(14, true),
+            (46, _, Released)   => self.input.set(14, false),
+            (47, _, Pressed)    => self.input.set(15, true),
+            (47, _, Released)   => self.input.set(15, false),
+
+            _ => (),
+        }
     }
 }

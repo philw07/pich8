@@ -56,8 +56,11 @@ pub struct CPU {
     draw: bool,                         // Drawing flag
     key_wait: bool,                     // Key wait flag
     key_reg: usize,                     // Key wait register
+    #[getset(get_copy = "pub", set = "pub")]
     quirk_load_store: bool,             // Flag for load store quirk
+    #[getset(get_copy = "pub", set = "pub")]
     quirk_shift: bool,                  // Flag for shift quirk
+    #[getset(get_copy = "pub", set = "pub")]
     vertical_wrapping: bool,            // Flag for vertical wrapping
 }
 

@@ -12,8 +12,8 @@ bitvec = { version = "0.19.3", features = ["serde"] }
 getset = "0.1.1"
 serde = { version = "1.0.117", features = ["derive"] }
 rmp-serde = "0.14.4"
-sdl2 = "0.34.3"
-spin_sleep = "1.0.0"
-
-[features]
-static-link = ["sdl2/static-link"]
+glium = "0.27.0"
+imgui = "0.5.0"
+imgui-glium-renderer = "0.5.0"
+imgui-winit-support = "0.5.0"
+tinyfiledialogs = "3.3.10"

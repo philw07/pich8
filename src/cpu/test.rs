@@ -1,11 +1,4 @@
 use super::*;
-use crate::contracts::DisplayOutput;
-
-struct DisplayMock{}
-impl DisplayOutput for DisplayMock {
-    fn draw(&mut self, _buffer: &BitArray<Msb0, [u64; 32]>) -> Result<(), String> {Ok(())}
-    fn toggle_fullscreen(&mut self) -> Result<(), String> {Ok(())}
-}
 
 #[test]
 fn test_initial_state() {

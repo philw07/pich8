@@ -1,88 +1,126 @@
-use crate::contracts::DisplayOutput;
 use bitvec::prelude::*;
-use getset::{Setters};
-use sdl2::{
-    Sdl,
-    video::{Window, FullscreenType},
-    render::Canvas,
-    pixels::Color,
-    rect::Rect,
-    mouse::MouseUtil,
+use getset::{Getters, Setters};
+use glium::{
+    Display,
+    glutin::{
+        window::WindowBuilder,
+        event_loop::EventLoop,
+        dpi::LogicalSize,
+        ContextBuilder,
+    },
+    implement_vertex,
+    Frame,
+    Surface,
+    uniforms::MagnifySamplerFilter,
+    texture::{
+        Texture2d,
+        RawImage2d,
+    },
 };
 
-#[derive(Setters)]
+#[derive(Getters, Setters)]
 pub struct WindowDisplay {
-    canvas: Canvas<Window>,
-    #[getset(set = "pub")]
-    bg_color: Color,
-    #[getset(set = "pub")]
-    fg_color: Color,
-    mouse: MouseUtil,
-}
-
-impl DisplayOutput for WindowDisplay {
-    fn draw(&mut self, buffer: &BitArray<Msb0, [u64; 32]>) -> Result<(), String> {
-        // Clear
-        self.canvas.set_draw_color(self.bg_color);
-        self.canvas.clear();
-
-        // Draw frame
-        let (width, height) = self.canvas.output_size()?;
-        let scale_w = width / WindowDisplay::C8_WIDTH;
-        let offset_x = (width - WindowDisplay::C8_WIDTH * scale_w) as i32 / 2;
-        let scale_h = height / WindowDisplay::C8_HEIGHT;
-        let offset_y = (height - WindowDisplay::C8_HEIGHT * scale_h) as i32 / 2;
-        for y in 0..32 {
-            for x in 0..64 {
-                self.canvas.set_draw_color(if buffer[self.get_index(x, y)] { self.fg_color } else { self.bg_color });
-                self.canvas.fill_rect(Rect::new(offset_x + scale_w as i32 * x as i32, offset_y + scale_h as i32 * y as i32, scale_w, scale_h))?;
-            }
-        }
-
-        self.canvas.present();
-        Ok(())
-    }
-
-    fn toggle_fullscreen(&mut self) -> Result<(), String> {
-        let state = if self.canvas.window().fullscreen_state() == FullscreenType::Desktop { FullscreenType::Off } else { FullscreenType::Desktop };
-        self.canvas.window_mut().set_fullscreen(state)?;
-        self.mouse.show_cursor(state == FullscreenType::Off);
-        Ok(())
-    }
+    display: Display,
+    frame_buffer: [u8; WindowDisplay::C8_WIDTH * WindowDisplay::C8_HEIGHT * 3],
+    #[getset(get = "pub", set = "pub")]
+    bg_color: [u8; 3],
+    #[getset(get = "pub", set = "pub")]
+    fg_color: [u8; 3],
 }
 
 impl WindowDisplay {
-    const WINDOW_NAME: &'static str = "pich8";
-    const BG_COLOR: Color = Color::BLACK;
-    const FG_COLOR: Color = Color::WHITE;
-    const WINDOW_WIDTH: u32 = 800;
-    const WINDOW_HEIGHT: u32 = WindowDisplay::WINDOW_WIDTH / (WindowDisplay::C8_WIDTH / WindowDisplay::C8_HEIGHT);
-    const C8_WIDTH: u32 = 64;
-    const C8_HEIGHT: u32 = 32;
+    const WINDOW_TITLE: &'static str = "pich8";
+    const BG_COLOR: [u8; 3] = [0; 3];
+    const FG_COLOR: [u8; 3] = [255; 3];
+    const WINDOW_WIDTH: f32 = 800.0;
+    const WINDOW_HEIGHT: f32 = WindowDisplay::WINDOW_WIDTH / (WindowDisplay::C8_WIDTH as f32 / WindowDisplay::C8_HEIGHT as f32);
+    const C8_WIDTH: usize = 64;
+    const C8_HEIGHT: usize = 32;
 
-    pub fn new(sdl_context: &Sdl, vsync: bool) -> Result<Self, String> {
-        let window = sdl_context.video()?
-            .window(WindowDisplay::WINDOW_NAME, WindowDisplay::WINDOW_WIDTH, WindowDisplay::WINDOW_HEIGHT)
-            .position_centered()
-            .resizable()
-            .opengl()
-            .allow_highdpi()
-            .build().map_err(|e| format!("couldn't setup window: {}", e))?;
-        let mut canvas_builder = window.into_canvas();
-        if vsync {
-            canvas_builder = canvas_builder.present_vsync();
-        }
-        let canvas = canvas_builder.build().map_err(|e| format!("couldn't setup canvas: {}", e))?;
+    pub fn new(event_loop: &EventLoop<()>, vsync: bool) -> Result<Self, String> {
+        // Create window
+        let context = ContextBuilder::new().with_vsync(vsync);
+        let builder = WindowBuilder::new()
+            .with_title(WindowDisplay::WINDOW_TITLE)
+            .with_min_inner_size(LogicalSize::new(8.0 * WindowDisplay::C8_WIDTH as f32, 8.0 * WindowDisplay::C8_HEIGHT as f32))
+            .with_inner_size(LogicalSize::new(WindowDisplay::WINDOW_WIDTH, WindowDisplay::WINDOW_HEIGHT));
+        let display = Display::new(builder, context, event_loop)
+            .map_err(|e| format!("Failed to create display: {}", e))?;
+        
+        // Clear screen with bg color
+        let mut target = display.draw();
+        let bg_color = WindowDisplay::BG_COLOR;
+        target.clear_color(bg_color[0] as f32 / 255.0, bg_color[1] as f32 / 255.0, bg_color[2] as f32 / 255.0, 1.0);
+        target.finish().map_err(|e| format!("Failed to swap buffers: {}", e))?;
 
         Ok(Self{
-            canvas,
-            bg_color: WindowDisplay::BG_COLOR,
+            display,
+            frame_buffer: [0; WindowDisplay::C8_WIDTH * WindowDisplay::C8_HEIGHT * 3],
+            bg_color,
             fg_color: WindowDisplay::FG_COLOR,
-            mouse: sdl_context.mouse(),
         })
     }
 
     fn get_index(&self, x: usize, y: usize) -> usize {
         (y * 64) + x
     }
+
+    pub fn display(&self) -> &Display {
+        &self.display
+    }
+
+    pub fn prepare(&mut self, buffer: &BitArray<Msb0, [u64; 32]>, menu_height: u32) -> Result<Frame, String> {
+        // Copy over new frame
+        for y in 0..WindowDisplay::C8_HEIGHT {
+            for x in 0..WindowDisplay::C8_WIDTH {
+                let idx = self.get_index(x, y);
+                let int_idx = self.get_index(x, y) * 3;
+                if buffer[idx] {
+                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.fg_color);
+                } else {
+                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.bg_color);
+                }
+            }
+        }
+
+        // Prepare texture
+        let mut frame = self.display.draw();
+        frame.clear_color(self.bg_color[0] as f32 / 255.0, self.bg_color[1] as f32 / 255.0, self.bg_color[2] as f32 / 255.0, 1.0);
+        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer, (WindowDisplay::C8_WIDTH as u32, WindowDisplay::C8_HEIGHT as u32));
+        let texture = Texture2d::new(&self.display, img)
+            .map_err(|e| format!("Failed to create texture: {}", e))?;
+
+        let window_size = self.display.gl_window().window().inner_size();
+        let height = window_size.height - menu_height;
+        texture.as_surface().blit_whole_color_to(&frame,
+            &glium::BlitTarget { left: 0, bottom: 0, width: window_size.width as i32, height: height as i32 }, MagnifySamplerFilter::Nearest);
+
+        Ok(frame)
+    }
+
+    pub fn render(&self, frame: Frame) -> Result<(), String> {
+        frame.finish()
+            .map_err(|e| format!("Failed to swap buffers: {}", e))?;
+        Ok(())
+    }
+
+    pub fn fullscreen(&self) -> bool {
+        self.display.gl_window().window().fullscreen() != None
+    }
+
+    pub fn toggle_fullscreen(&mut self) -> Result<(), String> {
+        let gl_window = self.display.gl_window();
+        let monitor_handle = gl_window.window().current_monitor();
+        let state = if gl_window.window().fullscreen().is_none() { Some(glium::glutin::window::Fullscreen::Borderless(monitor_handle)) } else { None };
+        gl_window.window().set_cursor_visible(state == None);
+        gl_window.window().set_fullscreen(state);
+        Ok(())
+    }
 }
+
+#[derive(Copy, Clone)]
+struct Vertex {
+    position: [f32; 2],
+    tex_coords: [f32; 2],
+}
+implement_vertex!(Vertex, position, tex_coords);

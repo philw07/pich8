@@ -3,9 +3,11 @@
 mod contracts;
 mod cpu;
 mod display;
+mod gui;
 mod sound;
 mod emulator;
 mod serde_big_array;
+mod file_dialog_handler;
 
 use emulator::Emulator;
 
@@ -16,6 +18,8 @@ fn main() {
         path = v[1].clone();
     }
     
-    let mut emu = Emulator::new().unwrap();
-    emu.run(&std::fs::read(&path).unwrap());
+    let event_loop = glium::glutin::event_loop::EventLoop::new();
+    let mut emu = Emulator::new_without_sound(&event_loop).unwrap();
+    emu.load_rom(&std::fs::read(&path).unwrap());
+    event_loop.run(move |event, _, ctrl_flow| emu.handle_event(event, ctrl_flow));
 }
