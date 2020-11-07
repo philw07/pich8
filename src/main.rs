@@ -1,6 +1,5 @@
 #![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
-mod contracts;
 mod cpu;
 mod display;
 mod gui;
@@ -19,7 +18,7 @@ fn main() {
     }
     
     let event_loop = glium::glutin::event_loop::EventLoop::new();
-    let mut emu = Emulator::new_without_sound(&event_loop).unwrap();
+    let mut emu = Emulator::new(&event_loop).unwrap();
     emu.load_rom(&std::fs::read(&path).unwrap());
     event_loop.run(move |event, _, ctrl_flow| emu.handle_event(event, ctrl_flow));
 }

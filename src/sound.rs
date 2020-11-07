@@ -1,44 +1,46 @@
-use crate::contracts::SoundOutput;
-// use std::f64::consts::PI;
+use std::time::Duration;
+use std::sync::mpsc::{Sender, channel};
+use rodio::{
+    queue::queue,
+    source::{Source, SineWave},
+    OutputStream,
+    Sink,
+};
 
-pub struct NoSound{}
-impl SoundOutput for NoSound { fn beep(&self) {} }
+pub struct BeepSound {
+    chan_tx: Sender<()>
+}
 
-// pub struct BeepSound {
-//     queue: AudioQueue<f32>,
-// }
+impl BeepSound {
+    const FREQUENCY: u32 = 440;
+    const VOLUME: f32 = 0.05;
 
-// impl SoundOutput for BeepSound {
-//     fn beep(&self) {
-//         let len = BeepSound::SAMPLING_RATE / 10;
-//         if self.queue.size() < len as u32 * 2 {
-//             // Create sine wave
-//             let mut buf = Vec::new();
-//             for i in 0..len {
-//                 buf.push(BeepSound::VOLUME * ((2.0 * PI as f32 * BeepSound::FREQUENCY * i as f32) / BeepSound::SAMPLING_RATE as f32).sin());
-//             }
-            
-//             // Queue and play it
-//             self.queue.queue(&buf);
-//             self.queue.resume();
-//         }
-//     }
-// }
+    pub fn new() -> Result<Self, String> {
+        let (tx, rx) = channel();
 
-// impl BeepSound {
-//     const SAMPLING_RATE: i32 = 48_000;
-//     const VOLUME: f32 = 0.05;
-//     const FREQUENCY: f32 = 440.0;
+        std::thread::spawn(move || {
+            let (queue, output_queue) = queue(true);
+            if let Ok((_stream, stream_handle)) = OutputStream::try_default() {
+                if let Ok(sink) = Sink::try_new(&stream_handle) {
+                    sink.set_volume(BeepSound::VOLUME);
+                    sink.append(output_queue);
+        
+                    loop {
+                        if rx.recv().is_ok() {
+                            queue.append(SineWave::new(BeepSound::FREQUENCY).take_duration(Duration::from_secs_f32(0.025)));
+                        }
+                    }
+                }
+            }
+        });
 
-//     pub fn new(sdl_context: &Sdl) -> Result<Self, String> {
-//         let spec = AudioSpecDesired{
-//             freq: Some(BeepSound::SAMPLING_RATE),
-//             channels: Some(1),
-//             samples: Some(2048),
-//         };
+        Ok(Self {
+            chan_tx: tx,
+        })
+    }
 
-//         Ok(Self{
-//             queue: sdl_context.audio()?.open_queue(None, &spec)?,
-//         })
-//     }
-// }
+    pub fn beep(&self) {
+        // Ignore if something went wrong
+        let _ = self.chan_tx.send(());
+    }
+}

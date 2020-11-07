@@ -1,8 +1,7 @@
-use crate::contracts::SoundOutput;
 use crate::cpu::CPU;
 use crate::display::WindowDisplay;
 use crate::gui::GUI;
-use crate::sound::NoSound;
+use crate::sound::BeepSound;
 use crate::file_dialog_handler::{FileDialogHandler, FileDialogResult, FileDialogType};
 use std::{time::Instant, fs};
 use bitvec::prelude::*;
@@ -28,12 +27,12 @@ enum LoadedType {
     State(Vec<u8>),
 }
 
-pub struct Emulator<T: SoundOutput> {
+pub struct Emulator {
     cpu: CPU,
     cpu_speed: u16,
     display: WindowDisplay,
     gui: GUI,
-    sound: T,
+    sound: BeepSound,
     mute: bool,
     input: BitArray<Msb0, [u16; 1]>,
     loaded: LoadedType,
@@ -45,24 +44,15 @@ pub struct Emulator<T: SoundOutput> {
     file_dialog: FileDialogHandler,
 }
 
-// impl Emulator<BeepSound> {
-//     pub fn new() -> Result<Self, String> {
-//         let event_loop = EventLoop::new();
-//         Ok(Self{
-//             cpu: CPU::new(),
-//             display: WindowDisplay::new(&event_loop, true)?,
-//             sound: BeepSound::new(&sdl_context)?,
-//             input: bitarr![Msb0, u16; 0; 16],
-//             event_loop,
-//         })
-//     }
-// }
+impl Emulator {
+    const CPU_FREQUENCY: u16 = 720;
+    const TIMER_FREQUENCY: u8 = 60;
+    const NANOS_PER_TIMER: u64 = 1_000_000_000 / Emulator::TIMER_FREQUENCY as u64;
 
-impl Emulator<NoSound> {
-    pub fn new_without_sound(event_loop: &EventLoop<()>) -> Result<Self, String> {
+    pub fn new(event_loop: &EventLoop<()>) -> Result<Self, String> {
         let display = WindowDisplay::new(&event_loop, false)?;
         let cpu = CPU::new();
-        let cpu_speed = Emulator::<NoSound>::CPU_FREQUENCY;
+        let cpu_speed = Emulator::CPU_FREQUENCY;
 
         // Initialize GUI
         let mut gui = GUI::new(display.display());
@@ -90,7 +80,7 @@ impl Emulator<NoSound> {
             cpu_speed,
             display,
             gui,
-            sound: NoSound{},
+            sound: BeepSound::new().expect("Failed to create sound output device"),
             mute: false,
             input: bitarr![Msb0, u16; 0; 16],
             loaded: LoadedType::Nothing,
@@ -102,12 +92,6 @@ impl Emulator<NoSound> {
             file_dialog: FileDialogHandler::new(),
         })
     }
-}
-
-impl<T: SoundOutput> Emulator<T> {
-    const CPU_FREQUENCY: u16 = 720;
-    const TIMER_FREQUENCY: u8 = 60;
-    const NANOS_PER_TIMER: u64 = 1_000_000_000 / Emulator::<T>::TIMER_FREQUENCY as u64;
 
     fn reset(&mut self) {
         match &self.loaded {
@@ -182,13 +166,13 @@ impl<T: SoundOutput> Emulator<T> {
                             self.last_cycle = Instant::now();
                             for _ in 0..cycles {
                                 self.cpu.tick(&self.input);
-                                if self.cpu.sound_active() && !self.mute {
-                                    self.sound.beep();
-                                }
                             }
                         }
                         // Update CPU timers
-                        if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::<T>::NANOS_PER_TIMER {
+                        if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::NANOS_PER_TIMER {
+                            if self.cpu.sound_active() && !self.mute {
+                                self.sound.beep();
+                            }
                             self.last_timer = Instant::now();
                             self.cpu.update_timers();
                         }

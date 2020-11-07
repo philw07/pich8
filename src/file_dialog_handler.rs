@@ -71,10 +71,12 @@ impl FileDialogHandler {
     pub fn check_result(&mut self) -> bool {
         let mut result = false;
         if self.chan_rx.is_some() {
-            if let Ok(dialog_result) = self.chan_rx.as_ref().unwrap().try_recv() {
-                self.last_result = dialog_result;
-                self.is_open = false;
-                result = true;
+            if let Some(chan) = self.chan_rx.as_ref() {
+                if let Ok(dialog_result) = chan.try_recv() {
+                    self.last_result = dialog_result;
+                    self.is_open = false;
+                    result = true;
+                }
             }
         }
 
