@@ -55,7 +55,8 @@ impl Emulator {
 
     pub fn new(event_loop: &EventLoop<()>) -> Result<Self, String> {
         let display = WindowDisplay::new(&event_loop, false)?;
-        let cpu = CPU::new();
+        let mut cpu = CPU::new();
+        cpu.load_rom(include_bytes!("../data/bootrom/pich8-logo.ch8"));
         let cpu_speed = Emulator::CPU_FREQUENCY;
 
         // Initialize GUI

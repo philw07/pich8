@@ -63,7 +63,7 @@ impl GUI {
 
         // Load custom font
         let roboto = imgui.fonts().add_font(&[FontSource::TtfData {
-            data: include_bytes!("../fonts/Roboto/Roboto-Regular.ttf"),
+            data: include_bytes!("../data/fonts/Roboto/Roboto-Regular.ttf"),
             size_pixels: GUI::FONT_SIZE,
             config: None,
         }]);
