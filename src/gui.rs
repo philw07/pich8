@@ -112,7 +112,7 @@ impl GUI {
         self.platform.handle_event(self.imgui.io_mut(), gl_window.window(), &event);
     }
 
-    pub fn render<S: Surface>(&mut self, delta_time: Duration, display: &Display, target: &mut S) -> Result<(), String> {
+    pub fn render<S: Surface>(&mut self, delta_time: Duration, display: &Display, target: &mut S, fps: f64) -> Result<(), String> {
         self.menu_open = false;
         self.imgui.io_mut().update_delta_time(delta_time);
 
@@ -122,17 +122,22 @@ impl GUI {
             if let Some(menu) = ui.begin_menu(im_str!("File"), true) {
                 self.menu_open = true;
                 MenuItem::new(im_str!("Open ROM..."))
+                    .shortcut(im_str!("Ctrl + O"))
                     .build_with_ref(&ui, &mut self.flag_open_rom);
                 ui.separator();
                 MenuItem::new(im_str!("Load State..."))
+                .shortcut(im_str!("Ctrl + Shift + O"))
                     .build_with_ref(&ui, &mut self.flag_load_state);
                 MenuItem::new(im_str!("Save State..."))
+                .shortcut(im_str!("Ctrl + S"))
                     .build_with_ref(&ui, &mut self.flag_save_state);
                 ui.separator();
                 MenuItem::new(im_str!("Reset"))
+                .shortcut(im_str!("F5"))
                     .build_with_ref(&ui, &mut self.flag_reset);
                     ui.separator();
                 MenuItem::new(im_str!("Exit"))
+                    .shortcut(im_str!("Esc"))
                     .build_with_ref(&ui, &mut self.flag_exit);
                 menu.end(&ui);
             }
@@ -181,7 +186,7 @@ impl GUI {
             }
 
             if self.flag_display_fps {
-                let fps = im_str!("{:.1} fps", ui.frame_count() as f64 / ui.time());
+                let fps = im_str!("{:.0} fps", fps);
                 let winwidth = display.gl_window().window().inner_size().width;
                 let textwidth = ui.calc_text_size(&fps, false, 0.0);
                 ui.same_line(winwidth as f32 - (textwidth[0] * 1.25));

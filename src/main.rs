@@ -7,6 +7,7 @@ mod sound;
 mod emulator;
 mod serde_big_array;
 mod file_dialog_handler;
+mod fps_counter;
 
 use emulator::Emulator;
 

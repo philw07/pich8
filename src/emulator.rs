@@ -3,6 +3,7 @@ use crate::display::WindowDisplay;
 use crate::gui::GUI;
 use crate::sound::BeepSound;
 use crate::file_dialog_handler::{FileDialogHandler, FileDialogResult, FileDialogType};
+use crate::fps_counter::FpsCounter;
 use std::{time::Instant, fs};
 use bitvec::prelude::*;
 use glium::{
@@ -17,6 +18,7 @@ use glium::{
             KeyboardInput,
             VirtualKeyCode,
             ElementState,
+            ModifiersState,
         },
     },
 };
@@ -33,6 +35,7 @@ pub struct Emulator {
     display: WindowDisplay,
     gui: GUI,
     sound: BeepSound,
+    fps_counter: FpsCounter,
     mute: bool,
     input: BitArray<Msb0, [u16; 1]>,
     loaded: LoadedType,
@@ -42,6 +45,7 @@ pub struct Emulator {
     last_cycle: Instant,
     pause_time: Instant,
     file_dialog: FileDialogHandler,
+    modifiers_state: ModifiersState,
 }
 
 impl Emulator {
@@ -90,6 +94,8 @@ impl Emulator {
             last_cycle: now,
             pause_time: now,
             file_dialog: FileDialogHandler::new(),
+            fps_counter: FpsCounter::new(),
+            modifiers_state: ModifiersState::empty(),
         })
     }
 
@@ -184,6 +190,7 @@ impl Emulator {
                     self.display.display().gl_window().window().request_redraw();
                 },
                 Event::RedrawRequested(_) => {
+                    let fps = self.fps_counter.tick();
                     let frame_duration = Instant::now() - self.frame_time;
                     self.frame_time = Instant::now();
 
@@ -191,12 +198,13 @@ impl Emulator {
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
                     let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to render frame");
                     if !is_fullscreen {
-                        self.gui.render(frame_duration, self.display.display(), &mut frame).expect("Failed to render GUI");
+                        self.gui.render(frame_duration, self.display.display(), &mut frame, fps).expect("Failed to render GUI");
                     }
                     self.display.render(frame).expect("Faield to render frame");
                 },
-                Event::WindowEvent{ event: WindowEvent::KeyboardInput { input: KeyboardInput{ scancode, virtual_keycode: Some(keycode), state, .. }, .. }, .. } => self.handle_input(scancode, keycode, state, ctrl_flow),
+                Event::WindowEvent{ event: WindowEvent::KeyboardInput { input, .. }, .. } => self.handle_input(input, ctrl_flow),
                 Event::WindowEvent{ event: WindowEvent::CloseRequested, .. } => *ctrl_flow = ControlFlow::Exit,
+                Event::WindowEvent{ event: WindowEvent::ModifiersChanged(modifiers_state), .. } => self.modifiers_state = modifiers_state,
                 _ => (),
             }
         }
@@ -264,57 +272,74 @@ impl Emulator {
     }
 
     #[inline]
-    fn handle_input(&mut self, scancode: u32, keycode: VirtualKeyCode, state: ElementState, ctrl_flow: &mut ControlFlow) {
+    fn handle_input(&mut self, KeyboardInput { scancode, virtual_keycode, state, .. }: KeyboardInput, ctrl_flow: &mut ControlFlow) {
         use VirtualKeyCode::*;
         use ElementState::*;
-        match (scancode, keycode, state) {
-            // Command keys
-            (_, Escape, Pressed) => {
-                if self.gui.flag_fullscreen() {
-                    self.gui.set_flag_fullscreen(false);
-                } else {
-                    *ctrl_flow = ControlFlow::Exit;
-                }
-            },
-            (_, F11, Pressed) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
-            (_, P, Pressed) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
-            (_, M, Pressed) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
+        if let Some(keycode) = virtual_keycode {
+            match (scancode, keycode, state) {
+                // Command keys
+                (_, Escape, Pressed) => {
+                    if self.gui.flag_fullscreen() {
+                        self.gui.set_flag_fullscreen(false);
+                    } else {
+                        *ctrl_flow = ControlFlow::Exit;
+                    }
+                },
+                (_, F11, Pressed) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
+                (_, F5, Pressed) => { self.gui.set_flag_reset(true); },
+                (_, P, Pressed) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
+                (_, M, Pressed) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
+                (_, O, Pressed) => {
+                    if self.modifiers_state.ctrl() {
+                        if self.modifiers_state.shift() {
+                            self.gui.set_flag_load_state(true);
+                        } else {
+                            self.gui.set_flag_open_rom(true);
+                        }
+                    }
+                },
+                (_, S, Pressed) => {
+                    if self.modifiers_state.ctrl() {
+                        self.gui.set_flag_save_state(true);
+                    }
+                },
 
-            // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
-            (2, _, Pressed)     => self.input.set(0, true),
-            (2, _, Released)    => self.input.set(0, false),
-            (3, _, Pressed)     => self.input.set(1, true),
-            (3, _, Released)    => self.input.set(1, false),
-            (4, _, Pressed)     => self.input.set(2, true),
-            (4, _, Released)    => self.input.set(2, false),
-            (5, _, Pressed)     => self.input.set(3, true),
-            (5, _, Released)    => self.input.set(3, false),
-            (16, _, Pressed)    => self.input.set(4, true),
-            (16, _, Released)   => self.input.set(4, false),
-            (17, _, Pressed)    => self.input.set(5, true),
-            (17, _, Released)   => self.input.set(5, false),
-            (18, _, Pressed)    => self.input.set(6, true),
-            (18, _, Released)   => self.input.set(6, false),
-            (19, _, Pressed)    => self.input.set(7, true),
-            (19, _, Released)   => self.input.set(7, false),
-            (30, _, Pressed)    => self.input.set(8, true),
-            (30, _, Released)   => self.input.set(8, false),
-            (31, _, Pressed)    => self.input.set(9, true),
-            (31, _, Released)   => self.input.set(9, false),
-            (32, _, Pressed)    => self.input.set(10, true),
-            (32, _, Released)   => self.input.set(10, false),
-            (33, _, Pressed)    => self.input.set(11, true),
-            (33, _, Released)   => self.input.set(11, false),
-            (44, _, Pressed)    => self.input.set(12, true),
-            (44, _, Released)   => self.input.set(12, false),
-            (45, _, Pressed)    => self.input.set(13, true),
-            (45, _, Released)   => self.input.set(13, false),
-            (46, _, Pressed)    => self.input.set(14, true),
-            (46, _, Released)   => self.input.set(14, false),
-            (47, _, Pressed)    => self.input.set(15, true),
-            (47, _, Released)   => self.input.set(15, false),
+                // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
+                (2, _, Pressed)     => self.input.set(0, true),
+                (2, _, Released)    => self.input.set(0, false),
+                (3, _, Pressed)     => self.input.set(1, true),
+                (3, _, Released)    => self.input.set(1, false),
+                (4, _, Pressed)     => self.input.set(2, true),
+                (4, _, Released)    => self.input.set(2, false),
+                (5, _, Pressed)     => self.input.set(3, true),
+                (5, _, Released)    => self.input.set(3, false),
+                (16, _, Pressed)    => self.input.set(4, true),
+                (16, _, Released)   => self.input.set(4, false),
+                (17, _, Pressed)    => self.input.set(5, true),
+                (17, _, Released)   => self.input.set(5, false),
+                (18, _, Pressed)    => self.input.set(6, true),
+                (18, _, Released)   => self.input.set(6, false),
+                (19, _, Pressed)    => self.input.set(7, true),
+                (19, _, Released)   => self.input.set(7, false),
+                (30, _, Pressed)    => self.input.set(8, true),
+                (30, _, Released)   => self.input.set(8, false),
+                (31, _, Pressed)    => self.input.set(9, true),
+                (31, _, Released)   => self.input.set(9, false),
+                (32, _, Pressed)    => self.input.set(10, true),
+                (32, _, Released)   => self.input.set(10, false),
+                (33, _, Pressed)    => self.input.set(11, true),
+                (33, _, Released)   => self.input.set(11, false),
+                (44, _, Pressed)    => self.input.set(12, true),
+                (44, _, Released)   => self.input.set(12, false),
+                (45, _, Pressed)    => self.input.set(13, true),
+                (45, _, Released)   => self.input.set(13, false),
+                (46, _, Pressed)    => self.input.set(14, true),
+                (46, _, Released)   => self.input.set(14, false),
+                (47, _, Pressed)    => self.input.set(15, true),
+                (47, _, Released)   => self.input.set(15, false),
 
-            _ => (),
+                _ => (),
+            }
         }
     }
 }
