@@ -98,9 +98,11 @@ impl Emulator {
             LoadedType::Rom(rom) => {
                 self.cpu = CPU::new();
                 self.cpu.load_rom(&rom);
+                self.gui.set_flag_pause(false);
             },
             LoadedType::State(state) => {
                 self.cpu = CPU::from_state(&state).expect("Failed to load state");
+                self.gui.set_flag_pause(false);
             },
             _ => (),
         }
