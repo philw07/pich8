@@ -53,8 +53,8 @@ impl Emulator {
     const TIMER_FREQUENCY: u8 = 60;
     const NANOS_PER_TIMER: u64 = 1_000_000_000 / Emulator::TIMER_FREQUENCY as u64;
 
-    pub fn new(event_loop: &EventLoop<()>) -> Result<Self, String> {
-        let display = WindowDisplay::new(&event_loop, false)?;
+    pub fn new(event_loop: &EventLoop<()>, vsync: bool) -> Result<Self, String> {
+        let display = WindowDisplay::new(&event_loop, vsync)?;
         let mut cpu = CPU::new();
         cpu.load_rom(include_bytes!("../data/bootrom/pich8-logo.ch8"));
         let cpu_speed = Emulator::CPU_FREQUENCY;
