@@ -46,6 +46,20 @@ impl WindowDisplay {
             .with_inner_size(LogicalSize::new(WindowDisplay::WINDOW_WIDTH, WindowDisplay::WINDOW_HEIGHT));
         let display = Display::new(builder, context, event_loop)
             .map_err(|e| format!("Failed to create display: {}", e))?;
+
+        {
+            // Unfortunately, the position cannot be set before constructing the window.
+            // At least on Windows that leads to the window "jumping" to the set position after creation.
+            let gl_window = &display.gl_window();
+            let window = gl_window.window();
+            let monitor_size = window.current_monitor().size();
+            let window_size = window.outer_size();
+            let position = glium::glutin::dpi::PhysicalPosition::new(
+                monitor_size.width / 2 - window_size.width / 2,
+                monitor_size.height / 2 - window_size.height / 2,
+            );
+            display.gl_window().window().set_outer_position(position);
+        }
         
         // Clear screen with bg color
         let mut target = display.draw();
