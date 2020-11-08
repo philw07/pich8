@@ -110,7 +110,10 @@ impl Emulator {
                 }
             },
             LoadedType::State(state) => {
-                self.cpu = CPU::from_state(&state).expect("Failed to load state");
+                match CPU::from_state(&state) {
+                    Ok(cpu) => self.cpu = cpu,
+                    Err(msg) => self.dialog_handler.open_error_message(&msg),
+                }
                 self.gui.set_flag_pause(false);
             },
             _ => (),
@@ -172,8 +175,14 @@ impl Emulator {
                     }
                 },
                 FileDialogResult::SaveState(file_path) => {
-                    let state = self.cpu.save_state().expect("Failed to save state");
-                    fs::write(file_path, state).expect("Failed to write file");
+                    match self.cpu.save_state() {
+                        Ok(state) => {
+                            if fs::write(file_path, state).is_err() {
+                                self.dialog_handler.open_error_message("Failed to write to file!");
+                            }
+                        },
+                        Err(msg) => self.dialog_handler.open_error_message(&msg),
+                    }
                 },
                 FileDialogResult::None => (),
             }
@@ -217,11 +226,11 @@ impl Emulator {
 
                     let is_fullscreen = self.display.fullscreen();
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
-                    let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to render frame");
+                    let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to prepare frame");
                     if !is_fullscreen {
                         self.gui.render(frame_duration, self.display.display(), &mut frame, fps).expect("Failed to render GUI");
                     }
-                    self.display.render(frame).expect("Faield to render frame");
+                    self.display.render(frame).expect("Failed to render frame");
                 },
                 Event::WindowEvent{ event: WindowEvent::KeyboardInput { input, .. }, .. } => self.handle_input(input, ctrl_flow),
                 Event::WindowEvent{ event: WindowEvent::CloseRequested, .. } => *ctrl_flow = ControlFlow::Exit,

@@ -116,12 +116,12 @@ impl CPU {
         cpu
     }
 
-    pub fn from_state(state: &[u8]) -> Result<Self, Error> {
-        Ok(rmp_serde::decode::from_slice(state)?)
+    pub fn from_state(state: &[u8]) -> Result<Self, String> {
+        Ok(rmp_serde::decode::from_slice(state).map_err(|_| "Failed to deserialize state!")?)
     }
 
-    pub fn save_state(&self) -> Result<Vec<u8>, Error> {
-        Ok(rmp_serde::encode::to_vec(self)?)
+    pub fn save_state(&self) -> Result<Vec<u8>, String> {
+        Ok(rmp_serde::encode::to_vec(self).map_err(|_| "Failed to serialize state!")?)
     }
 
     pub fn load_bootrom(&mut self) {
