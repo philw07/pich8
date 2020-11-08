@@ -1,7 +1,7 @@
 use std::time::Duration;
 use glium::{Display, Surface, glutin::event::Event};
 use getset::{CopyGetters, Getters, Setters};
-use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit};
+use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 
@@ -11,12 +11,13 @@ pub struct GUI {
     renderer: Renderer,
     platform: WinitPlatform,
     custom_font: FontId,
+    custom_font_big: FontId,
 
     // For convenience we're only reporting the height of the last frame
     last_menu_height: u32,
     
     #[getset(get_copy = "pub")]
-    menu_open: bool,
+    is_open: bool,
 
     // Flags
     #[getset(get_copy = "pub", set = "pub")]
@@ -53,6 +54,8 @@ pub struct GUI {
     flag_vertical_wrapping: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_mute: bool,
+
+    flag_about: bool,
 }
 
 impl GUI {
@@ -64,9 +67,15 @@ impl GUI {
         imgui.set_ini_filename(None);
 
         // Load custom font
+        let roboto_data = include_bytes!("../data/fonts/Roboto/Roboto-Regular.ttf");
         let roboto = imgui.fonts().add_font(&[FontSource::TtfData {
-            data: include_bytes!("../data/fonts/Roboto/Roboto-Regular.ttf"),
+            data: roboto_data,
             size_pixels: GUI::FONT_SIZE,
+            config: None,
+        }]);
+        let roboto_big = imgui.fonts().add_font(&[FontSource::TtfData {
+            data: roboto_data,
+            size_pixels: GUI::FONT_SIZE + 4.0,
             config: None,
         }]);
         
@@ -84,8 +93,9 @@ impl GUI {
             renderer,
             platform,
             custom_font: roboto,
+            custom_font_big: roboto_big,
             last_menu_height: 0,
-            menu_open: false,
+            is_open: false,
 
             flag_open_rom: false,
             flag_open_rom_url: false,
@@ -107,6 +117,8 @@ impl GUI {
             flag_quirk_shift: false,
             flag_vertical_wrapping: false,
             flag_mute: false,
+
+            flag_about: false,
         }
     }
 
@@ -116,14 +128,17 @@ impl GUI {
     }
 
     pub fn render<S: Surface>(&mut self, delta_time: Duration, display: &Display, target: &mut S, fps: f64) -> Result<(), String> {
-        self.menu_open = false;
+        self.is_open = false;
         self.imgui.io_mut().update_delta_time(delta_time);
 
+        let window_width = display.gl_window().window().inner_size().width;
+        let window_height = display.gl_window().window().inner_size().height;
+
         let ui = self.imgui.frame();
-        let roboto = ui.push_font(self.custom_font);
+        let cfont = ui.push_font(self.custom_font);
         if let Some(menu_bar) = ui.begin_main_menu_bar() {
             if let Some(menu) = ui.begin_menu(im_str!("File"), true) {
-                self.menu_open = true;
+                self.is_open = true;
                 MenuItem::new(im_str!("Open ROM File..."))
                     .shortcut(im_str!("Ctrl + O"))
                     .build_with_ref(&ui, &mut self.flag_open_rom);
@@ -148,7 +163,7 @@ impl GUI {
                 menu.end(&ui);
             }
             if let Some(menu) = ui.begin_menu(im_str!("View"), true) {
-                self.menu_open = true;
+                self.is_open = true;
                 MenuItem::new(im_str!("Fullscreen"))
                     .shortcut(im_str!("F11"))
                     .build_with_ref(&ui, &mut self.flag_fullscreen);
@@ -161,7 +176,7 @@ impl GUI {
                 menu.end(&ui);
             }
             if let Some(menu) = ui.begin_menu(im_str!("Settings"), true) {
-                self.menu_open = true;
+                self.is_open = true;
                 MenuItem::new(im_str!("Pause"))
                     .shortcut(im_str!("P"))
                     .build_with_ref(&ui, &mut self.flag_pause);
@@ -190,19 +205,49 @@ impl GUI {
                     .build_with_ref(&ui, &mut self.flag_mute);
                 menu.end(&ui);
             }
+            if let Some(menu) = ui.begin_menu(im_str!("Help"), true) {
+                self.is_open = true;
+                MenuItem::new(im_str!("About"))
+                    .build_with_ref(&ui, &mut self.flag_about);
+                menu.end(&ui);
+            }
 
             if self.flag_display_fps {
                 let fps = im_str!("{:.0} fps", fps);
-                let winwidth = display.gl_window().window().inner_size().width;
-                let textwidth = ui.calc_text_size(&fps, false, 0.0);
-                ui.same_line(winwidth as f32 - (textwidth[0] * 1.25));
+                let text_width = ui.calc_text_size(&fps, false, 0.0);
+                ui.same_line(window_width as f32 - (text_width[0] * 1.25));
                 ui.text_colored([0.75, 0.75, 0.75, 1.0], fps);
+            }
+            if self.flag_about {
+                self.is_open = true;
+                let about_win_size = [250.0, 110.0];
+                let about_win_pos = [
+                    window_width as f32 / 2.0 - about_win_size[0] / 2.0,
+                    window_height as f32 / 2.0 - about_win_size[1] / 2.0
+                ];
+                let custom_font_big = self.custom_font_big;
+                Window::new(im_str!("About"))
+                    .opened(&mut self.flag_about)
+                    .position(about_win_pos, Condition::Always)
+                    .size(about_win_size, Condition::Always)
+                    .resizable(false)
+                    .collapsible(false)
+                    .movable(false)
+                    .build(&ui, || {
+                        let cfont_big = ui.push_font(custom_font_big);
+                        GUI::centered_text(&ui, "pich8", about_win_size[0]);
+                        cfont_big.pop(&ui);
+
+                        ui.spacing();
+                        GUI::centered_text(&ui, "A cross-platform CHIP-8", about_win_size[0]);
+                        GUI::centered_text(&ui, "interpreter written in Rust", about_win_size[0]);
+                    });
             }
 
             // Store menu bar height with a bit of clearance
             self.last_menu_height = ui.window_size()[1] as u32 + GUI::MENU_HEIGHT_CLEARANCE;
 
-            roboto.pop(&ui);
+            cfont.pop(&ui);
             menu_bar.end(&ui);
         }
 
@@ -214,6 +259,13 @@ impl GUI {
             .map_err(|e| format!("Failed to render UI: {}", e))?;
 
         Ok(())
+    }
+
+    fn centered_text(ui: &Ui, text: &str, window_width: f32) {
+        let text = imgui::ImString::new(text);
+        let text_width = ui.calc_text_size(&text, false, 0.0)[0];
+        ui.set_cursor_pos([window_width / 2.0 - text_width / 2.0, ui.cursor_pos()[1]]);
+        ui.text(&text);
     }
 
     pub fn menu_height(&self) -> u32 {

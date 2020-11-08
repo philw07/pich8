@@ -236,8 +236,8 @@ impl Emulator {
         let fullscreen = self.display.fullscreen();
         let mut pause = false;
 
-        if self.gui.menu_open() && !fullscreen {
-            // Pause emulation while menu is open
+        if self.gui.is_open() && !fullscreen {
+            // Pause emulation while gui menu/window is open
             pause = true;
         }
 
