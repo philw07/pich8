@@ -40,6 +40,8 @@ pub struct CPU {
     mem: [u8; 4096],                    // Main memory
     #[getset(get = "pub")]
     vmem: BitArray<Msb0, [u64; 32]>,    // Graphics memory
+    #[getset(get = "pub")]
+    vmem2: BitArray<Msb0, [u64; 32]>,   // Additional graphics memory for HiRes mode
     stack: [u16; 16],                   // Stack to store locations before a jump occurs
     keys: BitArray<Msb0, [u16; 1]>,     // Keypad status
 
@@ -52,6 +54,8 @@ pub struct CPU {
     opcode: u16,                        // Current opcode
     sp: usize,                          // Current stack position
 
+    #[getset(get_copy = "pub")]
+    hires: bool,                        // HiRes mode flag
     #[getset(get_copy = "pub", set = "pub")]
     draw: bool,                         // Drawing flag
     key_wait: bool,                     // Key wait flag
@@ -90,6 +94,7 @@ impl CPU {
         let mut cpu = Self {
             mem: [0; 4096],
             vmem: bitarr![Msb0, u64; 0; 64*32],
+            vmem2: bitarr![Msb0, u64; 0; 64*32],
             stack: [0; 16],
             keys: bitarr![Msb0, u16; 0; 16],
 
@@ -102,6 +107,7 @@ impl CPU {
             opcode: 0,
             sp: 0,
 
+            hires: false,
             draw: false,
             key_wait: false,
             key_reg: 0,
@@ -134,6 +140,7 @@ impl CPU {
 
     pub fn load_rom(&mut self, prog: &[u8]) -> Result<(), String> {
         if prog.len() <= self.mem.len() - 0x200 {
+            self.hires = false;
             &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
             self.PC = CPU::PC_INITIAL;
             Ok(())
@@ -185,9 +192,10 @@ impl CPU {
 
         // Execute opcode
         match self.opcode & 0xF000 {
-            0x0000 => match nn {
-                0xE0 => self.opcode_0x00E0(),
-                0xEE => self.opcode_0x00EE(),
+            0x0000 => match nnn {
+                0x0E0 => self.opcode_0x00E0(),
+                0x0EE => self.opcode_0x00EE(),
+                0x230 => self.opcode_0x0230(),
                 _ => self.opcode_invalid(),
             },
             0x1000 => self.opcode_0x1NNN(nnn),
@@ -247,9 +255,10 @@ impl CPU {
         
         for (spr, mut y) in sprite.iter().zip(y..y+height) {
             // Wrap around
-            if y >= 32 {
+            let last_line = if self.hires { 64 } else { 32 };
+            if y >= last_line {
                 if self.vertical_wrapping {
-                    y %= 32;
+                    y %= last_line;
                 } else {
                     continue;
                 }
@@ -259,15 +268,24 @@ impl CPU {
                 // Wrap around
                 x %= 64;
                 
-                let idx = self.get_vmem_index(x, y);
+                let mut idx = self.get_vmem_index(x, y);
                 let bit = (spr >> i) & 0b1 > 0;
 
                 // Detect collision and draw pixel
-                if bit && self.vmem[idx] {
-                    collision = true;
+                if self.hires && idx >= self.vmem.len() {
+                    idx -= self.vmem.len();
+                    if bit && self.vmem2[idx] {
+                        collision = true;
+                    }
+                    let res = self.vmem2[idx] != bit;
+                    self.vmem2.set(idx, res);
+                } else {
+                    if bit && self.vmem[idx] {
+                        collision = true;
+                    }
+                    let res = self.vmem[idx] != bit;
+                    self.vmem.set(idx, res);
                 }
-                let res = self.vmem[idx] != bit;
-                self.vmem.set(idx, res);
             }
         }
 

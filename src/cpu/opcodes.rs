@@ -23,10 +23,29 @@ impl CPU {
         self.PC = self.stack[self.sp] + 2;
     }
 
+    // 0x0230 - Clear screen in HiRes mode
+    #[inline]
+    pub(super) fn opcode_0x0230(&mut self) {
+        if self.hires {
+            self.vmem.set_all(false);
+            self.vmem2.set_all(false);
+            self.draw = true;
+            self.PC += 2;
+        } else {
+            self.opcode_invalid();
+        }
+    }
+
     // 0x1NNN - Goto nnn
     #[inline]
     pub(super) fn opcode_0x1NNN(&mut self, nnn: u16) {
-        self.PC = nnn;
+        if nnn == 0x260 && self.PC == 0x200 {
+            // Activate hires mode
+            self.hires = true;
+            self.PC = 0x2C0;
+        } else {
+            self.PC = nnn;
+        }
     }
 
     // 0x2NNN - Call subroutine at nnn

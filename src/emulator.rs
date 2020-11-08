@@ -226,7 +226,11 @@ impl Emulator {
 
                     let is_fullscreen = self.display.fullscreen();
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
-                    let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to prepare frame");
+                    let mut frame = if self.cpu.hires() {
+                        self.display.prepare_hires(self.cpu.vmem(), self.cpu.vmem2(), height).expect("Failed to prepare frame")
+                    } else {
+                        self.display.prepare(self.cpu.vmem(), height).expect("Failed to prepare frame")
+                    };
                     if !is_fullscreen {
                         self.gui.render(frame_duration, self.display.display(), &mut frame, fps).expect("Failed to render GUI");
                     }
