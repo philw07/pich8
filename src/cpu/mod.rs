@@ -196,7 +196,7 @@ impl CPU {
                 0x0E0 => self.opcode_0x00E0(),
                 0x0EE => self.opcode_0x00EE(),
                 0x230 => self.opcode_0x0230(),
-                _ => self.opcode_invalid(),
+                _ => self.opcode_0x0NNN(),
             },
             0x1000 => self.opcode_0x1NNN(nnn),
             0x2000 => self.opcode_0x2NNN(nnn),

@@ -32,8 +32,14 @@ impl CPU {
             self.draw = true;
             self.PC += 2;
         } else {
-            self.opcode_invalid();
+            self.opcode_0x0NNN();
         }
+    }
+
+    // 0x0NNN - Legacy SYS call, ignored
+    #[inline]
+    pub(super) fn opcode_0x0NNN(&mut self) {
+        self.PC += 2;
     }
 
     // 0x1NNN - Goto nnn
