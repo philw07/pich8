@@ -125,7 +125,11 @@ impl CPU {
     }
 
     pub fn load_bootrom(&mut self) {
-        self.load_rom(include_bytes!("../../data/bootrom/pich8-logo.ch8")).unwrap();
+        self.load_rom(include_bytes!("../../data/roms/pich8-logo.ch8")).unwrap();
+    }
+
+    fn load_rom_invalid_opcode(&mut self) {
+        self.load_rom(include_bytes!("../../data/roms/pich8-invalid-opcode.ch8")).unwrap();
     }
 
     pub fn load_rom(&mut self, prog: &[u8]) -> Result<(), String> {

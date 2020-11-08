@@ -4,8 +4,8 @@ use super::*;
 impl CPU {
     // Invalid ipcode
     #[inline]
-    pub(super) fn opcode_invalid(&self) {
-        panic!("Invalid opcode {:#06X}", self.opcode);
+    pub(super) fn opcode_invalid(&mut self) {
+        self.load_rom_invalid_opcode();
     }
 
     // 0x00E0 - Clear display
