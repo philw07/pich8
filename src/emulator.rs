@@ -313,73 +313,77 @@ impl Emulator {
     fn handle_input(&mut self, KeyboardInput { scancode, virtual_keycode, state, .. }: KeyboardInput, ctrl_flow: &mut ControlFlow) {
         use VirtualKeyCode::*;
         use ElementState::*;
+        const SCANCODE_1: u32 = 2;
+        const SCANCODE_2: u32 = 3;
+        const SCANCODE_3: u32 = 4;
+        const SCANCODE_4: u32 = 5;
+        const SCANCODE_Q: u32 = 16;
+        const SCANCODE_W: u32 = 17;
+        const SCANCODE_E: u32 = 18;
+        const SCANCODE_R: u32 = 19;
+        const SCANCODE_A: u32 = 30;
+        const SCANCODE_S: u32 = 31;
+        const SCANCODE_D: u32 = 32;
+        const SCANCODE_F: u32 = 33;
+        const SCANCODE_Z: u32 = 44;
+        const SCANCODE_X: u32 = 45;
+        const SCANCODE_C: u32 = 46;
+        const SCANCODE_V: u32 = 47;
+
         if let Some(keycode) = virtual_keycode {
-            match (scancode, keycode, state) {
+            let ctrl = self.modifiers_state.ctrl();
+            let shift = self.modifiers_state.shift();
+            match (scancode, keycode, state, ctrl, shift) {
                 // Command keys
-                (_, Escape, Pressed) => {
+                (_, Escape, Pressed, _, _) => {
                     if self.gui.flag_fullscreen() {
                         self.gui.set_flag_fullscreen(false);
                     } else {
                         *ctrl_flow = ControlFlow::Exit;
                     }
                 },
-                (_, F11, Pressed) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
-                (_, F5, Pressed) => { self.gui.set_flag_reset(true); },
-                (_, P, Pressed) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
-                (_, M, Pressed) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
-                (_, O, Pressed) => {
-                    if self.modifiers_state.ctrl() {
-                        if self.modifiers_state.shift() {
-                            self.gui.set_flag_open_rom_url(true);
-                        } else {
-                            self.gui.set_flag_open_rom(true);
-                        }
-                    }
-                },
-                (_, L, Pressed) => {
-                    if self.modifiers_state.ctrl() {
-                        self.gui.set_flag_load_state(true);
-                    }
-                }
-                (_, S, Pressed) => {
-                    if self.modifiers_state.ctrl() {
-                        self.gui.set_flag_save_state(true);
-                    }
-                },
+                (_, F11, Pressed, _, _) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
+                (_, F5, Pressed, _, _) => { self.gui.set_flag_reset(true); },
+                (_, P, Pressed, _, _) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
+                (_, M, Pressed, _, _) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
+                (_, O, Pressed, true, true) => { self.gui.set_flag_open_rom_url(true); },
+                (_, O, Pressed, true, _) => { self.gui.set_flag_open_rom(true); },
+                (_, L, Pressed, true, _) => { self.gui.set_flag_load_state(true); },
+                (_, S, Pressed, true, _) => { self.gui.set_flag_save_state(true); },
 
                 // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
-                (2, _, Pressed)     => self.input.set(0, true),
-                (2, _, Released)    => self.input.set(0, false),
-                (3, _, Pressed)     => self.input.set(1, true),
-                (3, _, Released)    => self.input.set(1, false),
-                (4, _, Pressed)     => self.input.set(2, true),
-                (4, _, Released)    => self.input.set(2, false),
-                (5, _, Pressed)     => self.input.set(3, true),
-                (5, _, Released)    => self.input.set(3, false),
-                (16, _, Pressed)    => self.input.set(4, true),
-                (16, _, Released)   => self.input.set(4, false),
-                (17, _, Pressed)    => self.input.set(5, true),
-                (17, _, Released)   => self.input.set(5, false),
-                (18, _, Pressed)    => self.input.set(6, true),
-                (18, _, Released)   => self.input.set(6, false),
-                (19, _, Pressed)    => self.input.set(7, true),
-                (19, _, Released)   => self.input.set(7, false),
-                (30, _, Pressed)    => self.input.set(8, true),
-                (30, _, Released)   => self.input.set(8, false),
-                (31, _, Pressed)    => self.input.set(9, true),
-                (31, _, Released)   => self.input.set(9, false),
-                (32, _, Pressed)    => self.input.set(10, true),
-                (32, _, Released)   => self.input.set(10, false),
-                (33, _, Pressed)    => self.input.set(11, true),
-                (33, _, Released)   => self.input.set(11, false),
-                (44, _, Pressed)    => self.input.set(12, true),
-                (44, _, Released)   => self.input.set(12, false),
-                (45, _, Pressed)    => self.input.set(13, true),
-                (45, _, Released)   => self.input.set(13, false),
-                (46, _, Pressed)    => self.input.set(14, true),
-                (46, _, Released)   => self.input.set(14, false),
-                (47, _, Pressed)    => self.input.set(15, true),
-                (47, _, Released)   => self.input.set(15, false),
+                (SCANCODE_1, _, Pressed, _, _)     => self.input.set(1, true),
+                (SCANCODE_1, _, Released, _, _)    => self.input.set(1, false),
+                (SCANCODE_2, _, Pressed, _, _)     => self.input.set(2, true),
+                (SCANCODE_2, _, Released, _, _)    => self.input.set(2, false),
+                (SCANCODE_3, _, Pressed, _, _)     => self.input.set(3, true),
+                (SCANCODE_3, _, Released, _, _)    => self.input.set(3, false),
+                (SCANCODE_4, _, Pressed, _, _)     => self.input.set(0xC, true),
+                (SCANCODE_4, _, Released, _, _)    => self.input.set(0xC, false),
+                (SCANCODE_Q, _, Pressed, _, _)    => self.input.set(4, true),
+                (SCANCODE_Q, _, Released, _, _)   => self.input.set(4, false),
+                (SCANCODE_W, _, Pressed, _, _)    => self.input.set(5, true),
+                (SCANCODE_W, _, Released, _, _)   => self.input.set(5, false),
+                (SCANCODE_E, _, Pressed, _, _)    => self.input.set(6, true),
+                (SCANCODE_E, _, Released, _, _)   => self.input.set(6, false),
+                (SCANCODE_R, _, Pressed, _, _)    => self.input.set(0xD, true),
+                (SCANCODE_R, _, Released, _, _)   => self.input.set(0xD, false),
+                (SCANCODE_A, _, Pressed, _, _)    => self.input.set(7, true),
+                (SCANCODE_A, _, Released, _, _)   => self.input.set(7, false),
+                (SCANCODE_S, _, Pressed, _, _)    => self.input.set(8, true),
+                (SCANCODE_S, _, Released, _, _)   => self.input.set(8, false),
+                (SCANCODE_D, _, Pressed, _, _)    => self.input.set(9, true),
+                (SCANCODE_D, _, Released, _, _)   => self.input.set(9, false),
+                (SCANCODE_F, _, Pressed, _, _)    => self.input.set(0xE, true),
+                (SCANCODE_F, _, Released, _, _)   => self.input.set(0xE, false),
+                (SCANCODE_Z, _, Pressed, _, _)    => self.input.set(0xA, true),
+                (SCANCODE_Z, _, Released, _, _)   => self.input.set(0xA, false),
+                (SCANCODE_X, _, Pressed, _, _)    => self.input.set(0, true),
+                (SCANCODE_X, _, Released, _, _)   => self.input.set(0, false),
+                (SCANCODE_C, _, Pressed, _, _)    => self.input.set(0xB, true),
+                (SCANCODE_C, _, Released, _, _)   => self.input.set(0xB, false),
+                (SCANCODE_V, _, Pressed, _, _)    => self.input.set(0xF, true),
+                (SCANCODE_V, _, Released, _, _)   => self.input.set(0xF, false),
 
                 _ => (),
             }
