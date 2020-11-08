@@ -2,7 +2,7 @@ use crate::cpu::CPU;
 use crate::display::WindowDisplay;
 use crate::gui::GUI;
 use crate::sound::BeepSound;
-use crate::file_dialog_handler::{FileDialogHandler, FileDialogResult, FileDialogType};
+use crate::dialog_handler::{DialogHandler, FileDialogResult, FileDialogType};
 use crate::fps_counter::FpsCounter;
 use std::{time::Instant, fs};
 use bitvec::prelude::*;
@@ -44,7 +44,7 @@ pub struct Emulator {
     last_timer: Instant,
     last_cycle: Instant,
     pause_time: Instant,
-    file_dialog: FileDialogHandler,
+    dialog_handler: DialogHandler,
     modifiers_state: ModifiersState,
 }
 
@@ -56,7 +56,7 @@ impl Emulator {
     pub fn new(event_loop: &EventLoop<()>, vsync: bool) -> Result<Self, String> {
         let display = WindowDisplay::new(&event_loop, vsync)?;
         let mut cpu = CPU::new();
-        cpu.load_rom(include_bytes!("../data/bootrom/pich8-logo.ch8"));
+        cpu.load_bootrom();
         let cpu_speed = Emulator::CPU_FREQUENCY;
 
         // Initialize GUI
@@ -94,7 +94,7 @@ impl Emulator {
             last_timer: now,
             last_cycle: now,
             pause_time: now,
-            file_dialog: FileDialogHandler::new(),
+            dialog_handler: DialogHandler::new(),
             fps_counter: FpsCounter::new(),
             modifiers_state: ModifiersState::empty(),
         })
@@ -104,8 +104,10 @@ impl Emulator {
         match &self.loaded {
             LoadedType::Rom(rom) => {
                 self.cpu = CPU::new();
-                self.cpu.load_rom(&rom);
-                self.gui.set_flag_pause(false);
+                match self.cpu.load_rom(&rom) {
+                    Ok(_) => { self.gui.set_flag_pause(false); },
+                    Err(_) => self.dialog_handler.open_error_message("Data is not a valid ROM!"),
+                }
             },
             LoadedType::State(state) => {
                 self.cpu = CPU::from_state(&state).expect("Failed to load state");
@@ -125,6 +127,17 @@ impl Emulator {
         self.reset();
     }
 
+    fn download_rom(&self, url: &str) -> Result<Vec<u8>, String> {
+        let fail_text = "Failed to download data!";
+        let url = url::Url::parse(url).map_err(|_| "Invalid URL!")?;
+        let resp = reqwest::blocking::get(url).map_err(|_| fail_text)?;
+        if resp.status().is_success() {
+            Ok(resp.bytes().map_err(|_| fail_text)?.to_vec())
+        } else {
+            Err(fail_text.to_string())
+        }
+    }
+
     fn set_pause(&mut self, pause: bool) {
         self.pause = pause;
         if pause {
@@ -139,13 +152,20 @@ impl Emulator {
 
     pub fn handle_event(&mut self, event: Event<()>, ctrl_flow: &mut ControlFlow) {
         // Handle file dialogs
-        if self.file_dialog.is_open() && self.file_dialog.check_result() {
-            match self.file_dialog.last_result() {
+        if self.dialog_handler.is_open() && self.dialog_handler.check_result() {
+            match self.dialog_handler.last_result() {
                 FileDialogResult::OpenRom(file_path) => {
                     if let Ok(file) = fs::read(&file_path) {
                         self.load_rom(&file);
                     }
                 },
+                FileDialogResult::InputUrl(url) => {
+                    // Blocking the event loop, but should be fine for ROM files which are very small in size
+                    match self.download_rom(url) {
+                        Ok(data) => self.load_rom(&data),
+                        Err(msg) => self.dialog_handler.open_error_message(&msg),
+                    }
+                }
                 FileDialogResult::LoadState(file_path) => {
                     if let Ok(file) = fs::read(&file_path) {
                         self.load_state(&file);
@@ -160,7 +180,7 @@ impl Emulator {
         }
 
         // Handle events
-        if !self.file_dialog.is_open() {
+        if !self.dialog_handler.is_open() {
             self.gui.handle_event(self.display.display(), &event);
             match event {
                 Event::NewEvents(_) => {
@@ -222,15 +242,19 @@ impl Emulator {
         }
 
         if self.gui.flag_open_rom() {
-            self.file_dialog.open_dialog(FileDialogType::OpenRom);
+            self.dialog_handler.open_file_dialog(FileDialogType::OpenRom);
             self.gui.set_flag_open_rom(false);
         }
+        if self.gui.flag_open_rom_url() {
+            self.dialog_handler.open_file_dialog(FileDialogType::InputUrl);
+            self.gui.set_flag_open_rom_url(false);
+        }
         if self.gui.flag_load_state() {
-            self.file_dialog.open_dialog(FileDialogType::LoadState);
+            self.dialog_handler.open_file_dialog(FileDialogType::LoadState);
             self.gui.set_flag_load_state(false);
         }
         if self.gui.flag_save_state() {
-            self.file_dialog.open_dialog(FileDialogType::SaveState);
+            self.dialog_handler.open_file_dialog(FileDialogType::SaveState);
             self.gui.set_flag_save_state(false);
         }
         if self.gui.flag_reset() {
@@ -293,12 +317,17 @@ impl Emulator {
                 (_, O, Pressed) => {
                     if self.modifiers_state.ctrl() {
                         if self.modifiers_state.shift() {
-                            self.gui.set_flag_load_state(true);
+                            self.gui.set_flag_open_rom_url(true);
                         } else {
                             self.gui.set_flag_open_rom(true);
                         }
                     }
                 },
+                (_, L, Pressed) => {
+                    if self.modifiers_state.ctrl() {
+                        self.gui.set_flag_load_state(true);
+                    }
+                }
                 (_, S, Pressed) => {
                     if self.modifiers_state.ctrl() {
                         self.gui.set_flag_save_state(true);

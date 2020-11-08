@@ -22,6 +22,8 @@ pub struct GUI {
     #[getset(get_copy = "pub", set = "pub")]
     flag_open_rom: bool,
     #[getset(get_copy = "pub", set = "pub")]
+    flag_open_rom_url: bool,
+    #[getset(get_copy = "pub", set = "pub")]
     flag_load_state: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_save_state: bool,
@@ -86,6 +88,7 @@ impl GUI {
             menu_open: false,
 
             flag_open_rom: false,
+            flag_open_rom_url: false,
             flag_load_state: false,
             flag_save_state: false,
             flag_reset: false,
@@ -121,12 +124,15 @@ impl GUI {
         if let Some(menu_bar) = ui.begin_main_menu_bar() {
             if let Some(menu) = ui.begin_menu(im_str!("File"), true) {
                 self.menu_open = true;
-                MenuItem::new(im_str!("Open ROM..."))
+                MenuItem::new(im_str!("Open ROM File..."))
                     .shortcut(im_str!("Ctrl + O"))
                     .build_with_ref(&ui, &mut self.flag_open_rom);
+                MenuItem::new(im_str!("Open ROM from URL..."))
+                    .shortcut(im_str!("Ctrl + Shift + O"))
+                    .build_with_ref(&ui, &mut self.flag_open_rom_url);
                 ui.separator();
                 MenuItem::new(im_str!("Load State..."))
-                .shortcut(im_str!("Ctrl + Shift + O"))
+                    .shortcut(im_str!("Ctrl + L"))
                     .build_with_ref(&ui, &mut self.flag_load_state);
                 MenuItem::new(im_str!("Save State..."))
                 .shortcut(im_str!("Ctrl + S"))

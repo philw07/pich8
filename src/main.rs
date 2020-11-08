@@ -6,7 +6,7 @@ mod gui;
 mod sound;
 mod emulator;
 mod serde_big_array;
-mod file_dialog_handler;
+mod dialog_handler;
 mod fps_counter;
 
 use std::env;

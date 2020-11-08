@@ -124,9 +124,19 @@ impl CPU {
         Ok(rmp_serde::encode::to_vec(self)?)
     }
 
-    pub fn load_rom(&mut self, prog: &[u8]) {
-        &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
-        self.PC = CPU::PC_INITIAL;
+    pub fn load_bootrom(&mut self) {
+        self.load_rom(include_bytes!("../../data/bootrom/pich8-logo.ch8")).unwrap();
+    }
+
+    pub fn load_rom(&mut self, prog: &[u8]) -> Result<(), String> {
+        if prog.len() <= self.mem.len() - 0x200 {
+            &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
+            self.PC = CPU::PC_INITIAL;
+            Ok(())
+        } else {
+            self.load_bootrom();
+            Err("Invalid ROM!".to_string())
+        }
     }
 
     pub fn sound_active(&self) -> bool {

@@ -3,6 +3,7 @@ use getset::{CopyGetters, Getters};
 
 pub enum FileDialogType {
     OpenRom,
+    InputUrl,
     LoadState,
     SaveState,
 }
@@ -10,15 +11,16 @@ pub enum FileDialogType {
 pub enum FileDialogResult {
     None,
     OpenRom(String),
+    InputUrl(String),
     LoadState(String),
     SaveState(String),
 }
 
-/// This module handles file dialogs in a separate thread.
+/// This module handles dialogs in a separate thread.
 /// Unforutnately, it's necessary due to a bug in the winit event loop.
 /// See https://github.com/rust-windowing/winit/issues/1698
 #[derive(CopyGetters, Getters)]
-pub struct FileDialogHandler {
+pub struct DialogHandler {
     #[getset(get_copy = "pub")]
     is_open: bool,
     #[getset(get = "pub")]
@@ -26,7 +28,7 @@ pub struct FileDialogHandler {
     chan_rx: Option<Receiver<FileDialogResult>>,
 }
 
-impl FileDialogHandler {
+impl DialogHandler {
     const STATE_FILTER_PATT: &'static [&'static str] = &["*.p8s"];
     const STATE_FILTER_DESC: &'static str = "pich8 State (*.p8s)";
 
@@ -38,7 +40,7 @@ impl FileDialogHandler {
         }
     }
 
-    pub fn open_dialog(&mut self, dialog_type: FileDialogType) {
+    pub fn open_file_dialog(&mut self, dialog_type: FileDialogType) {
         self.is_open = true;
 
         let (tx, rx) = std::sync::mpsc::channel();
@@ -52,13 +54,20 @@ impl FileDialogHandler {
                         result = FileDialogResult::OpenRom(file_path);
                     }
                 },
+                FileDialogType::InputUrl => {
+                    if let Some(url) = tinyfiledialogs::input_box("Input ROM URL", "Please input the URL pointing to the ROM file.\nFor Github, please make sure to use the raw file link!", "") {
+                        if url.len() > 0 {
+                            result = FileDialogResult::InputUrl(url);
+                        }
+                    }
+                },
                 FileDialogType::LoadState => {
-                    if let Some(file_path) = tinyfiledialogs::open_file_dialog("Load State", "", Some((FileDialogHandler::STATE_FILTER_PATT, FileDialogHandler::STATE_FILTER_DESC))) {
+                    if let Some(file_path) = tinyfiledialogs::open_file_dialog("Load State", "", Some((DialogHandler::STATE_FILTER_PATT, DialogHandler::STATE_FILTER_DESC))) {
                         result = FileDialogResult::LoadState(file_path);
                     }
                 },
                 FileDialogType::SaveState => {
-                    if let Some(file_path) = tinyfiledialogs::save_file_dialog_with_filter("Save State", "", FileDialogHandler::STATE_FILTER_PATT, FileDialogHandler::STATE_FILTER_DESC) {
+                    if let Some(file_path) = tinyfiledialogs::save_file_dialog_with_filter("Save State", "", DialogHandler::STATE_FILTER_PATT, DialogHandler::STATE_FILTER_DESC) {
                         result = FileDialogResult::SaveState(if file_path.contains(".") { file_path } else { format!("{}.p8s", file_path) });
                     }
                 },
@@ -81,5 +90,12 @@ impl FileDialogHandler {
         }
 
         result
+    }
+
+    pub fn open_error_message(&self, message: &str) {
+        let msg = message.to_string();
+        std::thread::spawn(move || {
+            tinyfiledialogs::message_box_ok("Error", &msg, tinyfiledialogs::MessageBoxIcon::Error);
+        });
     }
 }

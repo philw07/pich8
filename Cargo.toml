@@ -19,3 +19,5 @@ imgui-winit-support = "0.5.0"
 tinyfiledialogs = "3.3.10"
 rodio = "0.13.0"
 getopts = "0.2.21"
+url = "2.2.0"
+reqwest = { version = "0.10.8", features = ["blocking"] }
