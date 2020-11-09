@@ -5,13 +5,20 @@ impl CPU {
     // Invalid ipcode
     #[inline]
     pub(super) fn opcode_invalid(&mut self) {
-        self.load_rom_invalid_opcode();
+        self.PC += 2;
+    }
+
+    // 0x00CN - SCHIP - Scroll display N lines down
+    #[inline]
+    pub(super) fn opcode_schip_0x00CN(&mut self, n: u8) {
+        self.vmem.scroll_down(n as usize);
+        self.PC += 2;
     }
 
     // 0x00E0 - Clear display
     #[inline]
     pub(super) fn opcode_0x00E0(&mut self) {
-        self.vmem.set_all(false);
+        self.vmem.clear();
         self.draw = true;
         self.PC += 2;
     }
@@ -23,12 +30,47 @@ impl CPU {
         self.PC = self.stack[self.sp] + 2;
     }
 
-    // 0x0230 - Clear screen in HiRes mode
+    // 0x00FB - SCHIP - Scroll display 4 pixels right
     #[inline]
-    pub(super) fn opcode_0x0230(&mut self) {
-        if self.hires {
-            self.vmem.set_all(false);
-            self.vmem2.set_all(false);
+    pub(super) fn opcode_schip_0x00FB(&mut self) {
+        self.vmem.scroll_right();
+        self.PC += 2;
+    }
+
+    // 0x00FC - SCHIP - Scroll display 4 pixels left
+    #[inline]
+    pub(super) fn opcode_schip_0x00FC(&mut self) {
+        self.vmem.scroll_left();
+        self.PC += 2;
+    }
+
+    // 0x00FD - SCHIP - Exit interpreter
+    #[inline]
+    pub(super) fn opcode_schip_0x00FD(&mut self) {
+        // Instead of actually exiting, we're creating an endless loop
+        self.mem[0x200..0x202].copy_from_slice(&[0x12, 0x00]);
+        self.PC = 0x200;
+    }
+
+    // 0x00FE - SCHIP - Disable extended screen mode
+    #[inline]
+    pub(super) fn opcode_schip_0x00FE(&mut self) {
+        self.vmem.set_video_mode(VideoMode::Default);
+        self.PC += 2;
+    }
+
+    // 0x00FF - SCHIP - Enable extended screen mode
+    #[inline]
+    pub(super) fn opcode_schip_0x00FF(&mut self) {
+        self.vmem.set_video_mode(VideoMode::Extended);
+        self.PC += 2;
+    }
+
+    // 0x0230 - HiRes - Clear screen
+    #[inline]
+    pub(super) fn opcode_hires_0x0230(&mut self) {
+        if self.vmem.video_mode() == &VideoMode::HiRes {
+            self.vmem.clear();
             self.draw = true;
             self.PC += 2;
         } else {
@@ -45,12 +87,17 @@ impl CPU {
     // 0x1NNN - Goto nnn
     #[inline]
     pub(super) fn opcode_0x1NNN(&mut self, nnn: u16) {
-        if nnn == 0x260 && self.PC == 0x200 {
-            // Activate hires mode
-            self.hires = true;
+        self.PC = nnn;
+    }
+
+    // 0x1260 - Activate HiRes mode - only if it's the first opcode
+    #[inline]
+    pub(super) fn opcode_0x1260(&mut self, nnn: u16) {
+        if self.PC == 0x200 {
+            self.vmem.set_video_mode(VideoMode::HiRes);
             self.PC = 0x2C0;
         } else {
-            self.PC = nnn;
+            self.opcode_0x1NNN(nnn);
         }
     }
 
@@ -270,6 +317,13 @@ impl CPU {
         self.PC += 2;
     }
 
+    // 0xFX30 - SCHIP - I = 10-byte sprite_add(Vx)
+    #[inline]
+    pub(super) fn opcode_schip_0xFX30(&mut self, x: usize) {
+        self.I = 0x50 + self.V[x] as u16 * 10;
+        self.PC += 2;
+    }
+
     // 0xFX33 - set_BCD(Vx)
     #[inline]
     pub(super) fn opcode_0xFX33(&mut self, x: usize) {
@@ -310,4 +364,17 @@ impl CPU {
         self.PC += 2;
     }
 
+    // 0xFX75 - SCHIP - Store V0..VX in RPL user flags (X < 8)
+    #[inline]
+    pub(super) fn opcode_schip_0xFX75(&mut self, x: usize) {
+        self.RPL[..=x].copy_from_slice(&self.V[..=x]);
+        self.PC += 2;
+    }
+
+    // 0xFX85 - SCHIP - Read V0..VX from RPL user flags (X < 8)
+    #[inline]
+    pub(super) fn opcode_schip_0xFX85(&mut self, x: usize) {
+        self.V[..=x].copy_from_slice(&self.RPL[..=x]);
+        self.PC += 2;
+    }
 }

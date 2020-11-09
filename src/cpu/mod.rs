@@ -4,6 +4,7 @@ use bitvec::prelude::*;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Serialize, Deserialize};
 use crate::serde_big_array::BigArray;
+use crate::video_memory::{VideoMemory, VideoMode};
 
 mod opcodes;
 
@@ -34,41 +35,39 @@ impl From<rmp_serde::decode::Error> for Error {
 }
 
 #[allow(non_snake_case)]
-#[derive(CopyGetters, Getters, Setters, Serialize, Deserialize, Debug)]
+#[derive(CopyGetters, Getters, Setters, Serialize, Deserialize)]
 pub struct CPU {
     #[serde(with = "BigArray")]
-    mem: [u8; 4096],                    // Main memory
+    mem: [u8; 4096],                        // Main memory
     #[getset(get = "pub")]
-    vmem: BitArray<Msb0, [u64; 32]>,    // Graphics memory
-    #[getset(get = "pub")]
-    vmem2: BitArray<Msb0, [u64; 32]>,   // Additional graphics memory for HiRes mode
-    stack: [u16; 16],                   // Stack to store locations before a jump occurs
-    keys: BitArray<Msb0, [u16; 1]>,     // Keypad status
+    vmem: VideoMemory,                      // Graphics memory
+    stack: [u16; 16],                       // Stack to store locations before a jump occurs
+    keys: BitArray<Msb0, [u16; 1]>,         // Keypad status
 
-    PC: u16,                            // Program counter
-    V: [u8; 16],                        // Registers
-    I: u16,                             // Index register
-    DT: u8,                             // Delay timer
-    ST: u8,                             // Sound timer
+    PC: u16,                                // Program counter
+    V: [u8; 16],                            // Registers
+    I: u16,                                 // Index register
+    DT: u8,                                 // Delay timer
+    ST: u8,                                 // Sound timer
+    RPL: [u8; 8],                           // HP48 RPL flags (used for S-CHIP)
 
-    opcode: u16,                        // Current opcode
-    sp: usize,                          // Current stack position
+    opcode: u16,                            // Current opcode
+    sp: usize,                              // Current stack position
 
-    #[getset(get_copy = "pub")]
-    hires: bool,                        // HiRes mode flag
     #[getset(get_copy = "pub", set = "pub")]
-    draw: bool,                         // Drawing flag
-    key_wait: bool,                     // Key wait flag
-    key_reg: usize,                     // Key wait register
+    draw: bool,                             // Drawing flag
+    key_wait: bool,                         // Key wait flag
+    key_reg: usize,                         // Key wait register
     #[getset(get_copy = "pub", set = "pub")]
-    quirk_load_store: bool,             // Flag for load store quirk
+    quirk_load_store: bool,                 // Flag for load store quirk
     #[getset(get_copy = "pub", set = "pub")]
-    quirk_shift: bool,                  // Flag for shift quirk
+    quirk_shift: bool,                      // Flag for shift quirk
     #[getset(get_copy = "pub", set = "pub")]
-    vertical_wrapping: bool,            // Flag for vertical wrapping
+    vertical_wrapping: bool,                // Flag for vertical wrapping
 }
 
 impl CPU {
+    const BOOTROM: &'static [u8] = include_bytes!("../../data/bootrom/pich8-logo.ch8");
     const PC_INITIAL: u16 = 0x200;
     const FONTSET: &'static [u8] = &[ 
         0xF0, 0x90, 0x90, 0x90, 0xF0,   // 0
@@ -88,13 +87,24 @@ impl CPU {
         0xF0, 0x80, 0xF0, 0x80, 0xF0,   // E
         0xF0, 0x80, 0xF0, 0x80, 0x80    // F
     ];
+    const FONTSET_SUPER: &'static [u8] = &[
+        0x3C, 0x7E, 0xC3, 0xC3, 0xC3, 0xC3, 0xC3, 0xC3, 0x7E, 0x3C, // 0
+        0x18, 0x38, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, // 1
+        0x3E, 0x7F, 0xC3, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0xFF, // 2
+        0x3C, 0x7E, 0xC3, 0x03, 0x0E, 0x0E, 0x03, 0xC3, 0x7E, 0x3C, // 3
+        0x06, 0x0E, 0x1E, 0x36, 0x66, 0xC6, 0xFF, 0xFF, 0x06, 0x06, // 4
+        0xFF, 0xFF, 0xC0, 0xC0, 0xFC, 0xFE, 0x03, 0xC3, 0x7E, 0x3C, // 5
+        0x3E, 0x7C, 0xC0, 0xC0, 0xFC, 0xFE, 0xC3, 0xC3, 0x7E, 0x3C, // 6
+        0xFF, 0xFF, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x60, // 7
+        0x3C, 0x7E, 0xC3, 0xC3, 0x7E, 0x7E, 0xC3, 0xC3, 0x7E, 0x3C, // 8
+        0x3C, 0x7E, 0xC3, 0xC3, 0x7F, 0x3F, 0x03, 0x03, 0x3E, 0x7C, // 9
+    ];
 
     pub fn new() -> Self
     {
         let mut cpu = Self {
             mem: [0; 4096],
-            vmem: bitarr![Msb0, u64; 0; 64*32],
-            vmem2: bitarr![Msb0, u64; 0; 64*32],
+            vmem: VideoMemory::new(),
             stack: [0; 16],
             keys: bitarr![Msb0, u16; 0; 16],
 
@@ -103,11 +113,11 @@ impl CPU {
             I: 0,
             DT: 0,
             ST: 0,
+            RPL: [0; 8],
 
             opcode: 0,
             sp: 0,
 
-            hires: false,
             draw: false,
             key_wait: false,
             key_reg: 0,
@@ -116,8 +126,9 @@ impl CPU {
             vertical_wrapping: true,
         };
         
-        // Load fontset
-        &cpu.mem[0..CPU::FONTSET.len()].copy_from_slice(CPU::FONTSET);
+        // Load fontsets
+        &cpu.mem[0..Self::FONTSET.len()].copy_from_slice(Self::FONTSET);
+        &cpu.mem[0x50..0x50+Self::FONTSET_SUPER.len()].copy_from_slice(Self::FONTSET_SUPER);
         
         cpu
     }
@@ -131,16 +142,12 @@ impl CPU {
     }
 
     pub fn load_bootrom(&mut self) {
-        self.load_rom(include_bytes!("../../data/roms/pich8-logo.ch8")).unwrap();
-    }
-
-    fn load_rom_invalid_opcode(&mut self) {
-        self.load_rom(include_bytes!("../../data/roms/pich8-invalid-opcode.ch8")).unwrap();
+        self.load_rom(Self::BOOTROM).unwrap();
     }
 
     pub fn load_rom(&mut self, prog: &[u8]) -> Result<(), String> {
         if prog.len() <= self.mem.len() - 0x200 {
-            self.hires = false;
+            self.vmem.set_video_mode(VideoMode::Default);
             &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
             self.PC = CPU::PC_INITIAL;
             Ok(())
@@ -182,10 +189,11 @@ impl CPU {
     fn emulate_cycle(&mut self) {
         // Fetch opcode
         self.opcode = (self.mem[self.PC as usize] as u16) << 8 | (self.mem[(self.PC + 1) as usize] as u16);
-        
+
         // Decode opcode
         let x = (self.opcode & 0x0F00) as usize >> 8;
         let y = (self.opcode & 0x00F0) as usize >> 4;
+        let n = (self.opcode & 0x000F) as u8;
         let nn = (self.opcode & 0x00FF) as u8;
         let nnn = (self.opcode & 0x0FFF) as u16;
         let last_nibble = self.opcode & 0x000F;
@@ -193,12 +201,21 @@ impl CPU {
         // Execute opcode
         match self.opcode & 0xF000 {
             0x0000 => match nnn {
+                0x0C1..=0x0CF => self.opcode_schip_0x00CN(n),
                 0x0E0 => self.opcode_0x00E0(),
                 0x0EE => self.opcode_0x00EE(),
-                0x230 => self.opcode_0x0230(),
+                0x0FB => self.opcode_schip_0x00FB(),
+                0x0FC => self.opcode_schip_0x00FC(),
+                0x0FD => self.opcode_schip_0x00FD(),
+                0x0FE => self.opcode_schip_0x00FE(),
+                0x0FF => self.opcode_schip_0x00FF(),
+                0x230 => self.opcode_hires_0x0230(),
                 _ => self.opcode_0x0NNN(),
             },
-            0x1000 => self.opcode_0x1NNN(nnn),
+            0x1000 => match nnn {
+                0x260 => self.opcode_0x1260(nnn),
+                _ => self.opcode_0x1NNN(nnn),
+            },
             0x2000 => self.opcode_0x2NNN(nnn),
             0x3000 => self.opcode_0x3XNN(x, nn),
             0x4000 => self.opcode_0x4XNN(x, nn),
@@ -240,9 +257,12 @@ impl CPU {
                     0x18 => self.opcode_0xFX18(x),
                     0x1E => self.opcode_0xFX1E(x),
                     0x29 => self.opcode_0xFX29(x),
+                    0x30 => self.opcode_schip_0xFX30(x),
                     0x33 => self.opcode_0xFX33(x),
                     0x55 => self.opcode_0xFX55(x),
                     0x65 => self.opcode_0xFX65(x),
+                    0x75 => self.opcode_schip_0xFX75(x),
+                    0x85 => self.opcode_schip_0xFX85(x),
                     _ => self.opcode_invalid(),
             },
             _ => self.opcode_invalid(),
@@ -250,12 +270,16 @@ impl CPU {
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {
-        let sprite = &self.mem[self.I as usize..self.I as usize + height];
+        let step = if height == 0 { 2 } else { 1 };
+        let width = if height == 0 { 16 } else { 8 };
+        let height = if height == 0 { 16 } else { height };
+
+        let sprite = &self.mem[self.I as usize..self.I as usize + (width/8) * height];
         let mut collision = false;
-        
-        for (spr, mut y) in sprite.iter().zip(y..y+height) {
+
+        for (k, mut y) in (0..sprite.len()).step_by(step).zip(y..y+height) {
             // Wrap around
-            let last_line = if self.hires { 64 } else { 32 };
+            let last_line = self.vmem.height();
             if y >= last_line {
                 if self.vertical_wrapping {
                     y %= last_line;
@@ -264,36 +288,27 @@ impl CPU {
                 }
             }
 
-            for (mut x, i) in (x..x+8).zip((0..8).rev()) {
+            for (mut x, i) in (x..x+width).zip((0..width).rev()) {
                 // Wrap around
-                x %= 64;
-                
-                let mut idx = self.get_vmem_index(x, y);
-                let bit = (spr >> i) & 0b1 > 0;
+                x %= self.vmem.width();
+
+                // Get bit
+                let bit = if width == 16 {
+                    ((sprite[k] as u16) << 8 | sprite[k+1] as u16) >> i & 0b1 > 0
+                } else {
+                    sprite[k] >> i & 0b1 > 0
+                };
 
                 // Detect collision and draw pixel
-                if self.hires && idx >= self.vmem.len() {
-                    idx -= self.vmem.len();
-                    if bit && self.vmem2[idx] {
-                        collision = true;
-                    }
-                    let res = self.vmem2[idx] != bit;
-                    self.vmem2.set(idx, res);
-                } else {
-                    if bit && self.vmem[idx] {
-                        collision = true;
-                    }
-                    let res = self.vmem[idx] != bit;
-                    self.vmem.set(idx, res);
+                if bit && self.vmem.get(x, y) {
+                    collision = true;
                 }
+                let res = self.vmem.get(x, y) != bit;
+                self.vmem.set(x, y, res);
             }
         }
 
         self.V[0xF] = collision as u8;
-    }
-
-    fn get_vmem_index(&self, x: usize, y: usize) -> usize {
-        (y * 64) + x
     }
 }
 

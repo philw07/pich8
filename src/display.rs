@@ -1,4 +1,4 @@
-use bitvec::prelude::*;
+use crate::video_memory::VideoMemory;
 use getset::{Getters, Setters};
 use glium::{
     Display,
@@ -21,7 +21,7 @@ use glium::{
 #[derive(Getters, Setters)]
 pub struct WindowDisplay {
     display: Display,
-    frame_buffer: [u8; WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
+    frame_buffer: [u8; 2*WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
     #[getset(get = "pub", set = "pub")]
     bg_color: [u8; 3],
     #[getset(get = "pub", set = "pub")]
@@ -69,73 +69,32 @@ impl WindowDisplay {
 
         Ok(Self{
             display,
-            frame_buffer: [0; WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
+            frame_buffer: [0; 2*WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
             bg_color,
             fg_color: WindowDisplay::FG_COLOR,
         })
-    }
-
-    fn get_index(&self, x: usize, y: usize) -> usize {
-        (y * 64) + x
     }
 
     pub fn display(&self) -> &Display {
         &self.display
     }
 
-    pub fn prepare(&mut self, buffer: &BitArray<Msb0, [u64; 32]>, menu_height: u32) -> Result<Frame, String> {
+    pub fn prepare(&mut self, vmem: &VideoMemory, menu_height: u32) -> Result<Frame, String> {
         // Copy over new frame
-        for y in 0..WindowDisplay::C8_HEIGHT {
-            for x in 0..WindowDisplay::C8_WIDTH {
-                let idx = self.get_index(x, y);
-                let int_idx = self.get_index(x, y) * 3;
-                if buffer[idx] {
-                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.fg_color);
-                } else {
-                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.bg_color);
-                }
+        for idx in 0..vmem.width()*vmem.height() {
+            let buf_idx = idx * 3;
+            if vmem[idx] {
+                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.fg_color);
+            } else {
+                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.bg_color);
             }
         }
+        let frame_len = vmem.width() * vmem.height() * 3;
 
         // Prepare texture
         let mut frame = self.display.draw();
         frame.clear_color(self.bg_color[0] as f32 / 255.0, self.bg_color[1] as f32 / 255.0, self.bg_color[2] as f32 / 255.0, 1.0);
-        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..self.frame_buffer.len()/2], (WindowDisplay::C8_WIDTH as u32, WindowDisplay::C8_HEIGHT as u32));
-        let texture = Texture2d::new(&self.display, img)
-            .map_err(|e| format!("Failed to create texture: {}", e))?;
-
-        let window_size = self.display.gl_window().window().inner_size();
-        let height = window_size.height - menu_height;
-        texture.as_surface().blit_whole_color_to(&frame,
-            &glium::BlitTarget { left: 0, bottom: 0, width: window_size.width as i32, height: height as i32 }, MagnifySamplerFilter::Nearest);
-
-        Ok(frame)
-    }
-
-    pub fn prepare_hires(&mut self, buffer: &BitArray<Msb0, [u64; 32]>, buffer2: &BitArray<Msb0, [u64; 32]>, menu_height: u32) -> Result<Frame, String> {
-        // Copy over new frame
-        for y in 0..WindowDisplay::C8_HEIGHT {
-            for x in 0..WindowDisplay::C8_WIDTH {
-                let idx = self.get_index(x, y);
-                let int_idx = self.get_index(x, y) * 3;
-                if buffer[idx] {
-                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.fg_color);
-                } else {
-                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.bg_color);
-                }
-                let int_idx = int_idx + self.frame_buffer.len() / 2;
-                if buffer2[idx] {
-                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.fg_color);
-                } else {
-                    self.frame_buffer[int_idx..int_idx+3].copy_from_slice(&self.bg_color);
-                }
-            }
-        }
-
-        // Prepare texture
-        let mut frame = self.display.draw();
-        frame.clear_color(self.bg_color[0] as f32 / 255.0, self.bg_color[1] as f32 / 255.0, self.bg_color[2] as f32 / 255.0, 1.0);
-        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer, (WindowDisplay::C8_WIDTH as u32, 2*WindowDisplay::C8_HEIGHT as u32));
+        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..frame_len], (vmem.width() as u32, vmem.height() as u32));
         let texture = Texture2d::new(&self.display, img)
             .map_err(|e| format!("Failed to create texture: {}", e))?;
 
