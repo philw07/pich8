@@ -51,6 +51,8 @@ pub struct GUI {
     #[getset(get_copy = "pub", set = "pub")]
     flag_quirk_shift: bool,
     #[getset(get_copy = "pub", set = "pub")]
+    flag_quirk_draw: bool,
+    #[getset(get_copy = "pub", set = "pub")]
     flag_vertical_wrapping: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_mute: bool,
@@ -115,6 +117,7 @@ impl GUI {
 
             flag_quirk_load_store: false,
             flag_quirk_shift: false,
+            flag_quirk_draw: false,
             flag_vertical_wrapping: false,
             flag_mute: false,
 
@@ -195,6 +198,8 @@ impl GUI {
                         .build_with_ref(&ui, &mut self.flag_quirk_load_store);
                     MenuItem::new(im_str!("Shift"))
                         .build_with_ref(&ui, &mut self.flag_quirk_shift);
+                    MenuItem::new(im_str!("Draw"))
+                        .build_with_ref(&ui, &mut self.flag_quirk_draw);
                     quirks_menu.end(&ui);
                 }
                 MenuItem::new(im_str!("Vertical Wrapping"))

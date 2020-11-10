@@ -62,6 +62,11 @@ pub struct CPU {
     quirk_load_store: bool,                 // Flag for load store quirk
     #[getset(get_copy = "pub", set = "pub")]
     quirk_shift: bool,                      // Flag for shift quirk
+    // Originally, a 16x16 sprite is only drawn if n == 0 AND extended display mode (128x64) is active (CHIP8.DOC by David Winter).
+    // In default mode (64x32) however, if n (height) == 0, a 8x16 pixels sprite is drawn.
+    // However, Octo and many other emulators only check for n == 0, so some ROMs (e.g. Eaty the Alien) assume this check instead.
+    #[getset(get_copy = "pub", set = "pub")]
+    quirk_draw: bool,                       // Flag for draw quirk
     #[getset(get_copy = "pub", set = "pub")]
     vertical_wrapping: bool,                // Flag for vertical wrapping
 }
@@ -123,6 +128,7 @@ impl CPU {
             key_reg: 0,
             quirk_load_store: true,
             quirk_shift: true,
+            quirk_draw: true,
             vertical_wrapping: true,
         };
         
@@ -270,11 +276,7 @@ impl CPU {
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {
-        // It seems many emulators implementing S-CHIP get this wrong.
-        // A 16x16 sprite is only drawn if n (height) == 0 AND we're in extended display mode (128x64).
-        // In default mode (64x32) however, if n (height) == 0, a 8x16 pixels sprite is drawn.
-        // Source: CHIP8.DOC by David Winter
-        let big_sprite = self.vmem.video_mode() == &VideoMode::Extended && height == 0;
+        let big_sprite = (self.vmem.video_mode() == &VideoMode::Extended || self.quirk_draw) && height == 0;
         let step = if big_sprite { 2 } else { 1 };
         let width = if big_sprite { 16 } else { 8 };
         let height = if height == 0 { 16 } else { height };

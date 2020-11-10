@@ -63,6 +63,7 @@ impl Emulator {
         let mut gui = GUI::new(display.display());
         gui.set_flag_quirk_load_store(cpu.quirk_load_store());
         gui.set_flag_quirk_shift(cpu.quirk_shift());
+        gui.set_flag_quirk_draw(cpu.quirk_draw());
         gui.set_flag_vertical_wrapping(cpu.vertical_wrapping());
         gui.set_cpu_speed(cpu_speed);
 
@@ -297,6 +298,7 @@ impl Emulator {
         self.cpu_speed = self.gui.cpu_speed();
         self.cpu.set_quirk_load_store(self.gui.flag_quirk_load_store());
         self.cpu.set_quirk_shift(self.gui.flag_quirk_shift());
+        self.cpu.set_quirk_draw(self.gui.flag_quirk_draw());
         self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
         self.mute = self.gui.flag_mute();
 
