@@ -84,6 +84,10 @@ impl VideoMemory {
     }
 
     pub fn scroll_down(&mut self, lines: usize) {
+        // In default video mode (64x32), only half the lines are scrolled.
+        // In case of an odd number, the scroll is performed with a half pixel shift, however the current implementation doesn't allow that.
+        // Source: CHIP8.DOC by David Winter
+        let lines = if self.video_mode == VideoMode::Extended { lines } else { lines / 2 };
         for y in (0..self.height()).rev() {
             for x in 0..self.width() {
                 let val = if y < lines { false } else { self.get(x, y - lines) };
@@ -93,18 +97,20 @@ impl VideoMemory {
     }
 
     pub fn scroll_left(&mut self) {
+        let num = if self.video_mode == VideoMode::Extended { 4 } else { 2 };
         for x in 0..self.width() {
             for y in 0..self.height() {
-                let val = if x >= self.width() - 4 { false } else { self.get(x + 4, y) };
+                let val = if x >= self.width() - num { false } else { self.get(x + num, y) };
                 self.set(x, y, val);
             }
         }
     }
 
     pub fn scroll_right(&mut self) {
+        let num = if self.video_mode == VideoMode::Extended { 4 } else { 2 };
         for x in (0..self.width()).rev() {
             for y in 0..self.height() {
-                let val = if x < 4 { false } else { self.get(x - 4, y) };
+                let val = if x < num { false } else { self.get(x - num, y) };
                 self.set(x, y, val);
             }
         }

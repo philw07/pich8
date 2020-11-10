@@ -23,8 +23,7 @@ A cross-platform CHIP-8 and SUPER-CHIP interpreter written in Rust
 
 ## Resources
 
-These are the resources I mostly used during development.
-
+- https://github.com/tobiasvl/awesome-chip-8
 - http://www.pong-story.com/chip8/ (especially CHIP8.DOC)
 - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 - http://devernay.free.fr/hacks/chip8/schip.txt

@@ -270,8 +270,13 @@ impl CPU {
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {
-        let step = if height == 0 { 2 } else { 1 };
-        let width = if height == 0 { 16 } else { 8 };
+        // It seems many emulators implementing S-CHIP get this wrong.
+        // A 16x16 sprite is only drawn if n (height) == 0 AND we're in extended display mode (128x64).
+        // In default mode (64x32) however, if n (height) == 0, a 8x16 pixels sprite is drawn.
+        // Source: CHIP8.DOC by David Winter
+        let big_sprite = self.vmem.video_mode() == &VideoMode::Extended && height == 0;
+        let step = if big_sprite { 2 } else { 1 };
+        let width = if big_sprite { 16 } else { 8 };
         let height = if height == 0 { 16 } else { height };
 
         let sprite = &self.mem[self.I as usize..self.I as usize + (width/8) * height];
