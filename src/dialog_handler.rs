@@ -91,11 +91,4 @@ impl DialogHandler {
 
         result
     }
-
-    pub fn open_error_message(&self, message: &str) {
-        let msg = message.to_string();
-        std::thread::spawn(move || {
-            tinyfiledialogs::message_box_ok("Error", &msg, tinyfiledialogs::MessageBoxIcon::Error);
-        });
-    }
 }

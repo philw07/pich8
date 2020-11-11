@@ -1,7 +1,7 @@
 use std::time::Duration;
 use glium::{Display, Surface, glutin::event::Event};
 use getset::{CopyGetters, Getters, Setters};
-use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition};
+use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition, ImString};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 
@@ -58,6 +58,8 @@ pub struct GUI {
     flag_mute: bool,
 
     flag_about: bool,
+    flag_error: bool,
+    error_text: ImString,
 }
 
 impl GUI {
@@ -122,6 +124,8 @@ impl GUI {
             flag_mute: false,
 
             flag_about: false,
+            flag_error: false,
+            error_text: ImString::new(""),
         }
     }
 
@@ -240,13 +244,34 @@ impl GUI {
                     .movable(false)
                     .build(&ui, || {
                         let cfont_big = ui.push_font(custom_font_big);
-                        GUI::centered_text(&ui, "pich8", about_win_size[0]);
+                        GUI::centered_text(&ui, im_str!("pich8"), about_win_size[0]);
                         cfont_big.pop(&ui);
 
                         ui.spacing();
-                        GUI::centered_text(&ui, "A cross-platform CHIP-8", about_win_size[0]);
-                        GUI::centered_text(&ui, "interpreter written in Rust", about_win_size[0]);
+                        GUI::centered_text(&ui, im_str!("A cross-platform CHIP-8"), about_win_size[0]);
+                        GUI::centered_text(&ui, im_str!("interpreter written in Rust"), about_win_size[0]);
                     });
+            }
+            if self.flag_error {
+                self.is_open = true;
+                let text_size = ui.calc_text_size(&self.error_text, false, 250.0);
+                let error_win_size = [text_size[0] + 50.0, text_size[1] + 40.0];
+                let error_win_pos = [
+                    window_width as f32 / 2.0 - error_win_size[0] / 2.0,
+                    window_height as f32 / 2.0 - error_win_size[1] / 2.0
+                ];
+                let error_text = &self.error_text;
+                Window::new(im_str!("Error"))
+                .opened(&mut self.flag_error)
+                .position(error_win_pos, Condition::Always)
+                .size(error_win_size, Condition::Always)
+                .resizable(false)
+                .collapsible(false)
+                .movable(false)
+                .build(&ui, || {
+                    ui.set_cursor_pos([error_win_size[0] / 2.0 - text_size[0] / 2.0, ui.cursor_pos()[1]]);
+                    ui.text_wrapped(&error_text);
+                });
             }
 
             // Store menu bar height with a bit of clearance
@@ -266,11 +291,10 @@ impl GUI {
         Ok(())
     }
 
-    fn centered_text(ui: &Ui, text: &str, window_width: f32) {
-        let text = imgui::ImString::new(text);
-        let text_width = ui.calc_text_size(&text, false, 0.0)[0];
+    fn centered_text(ui: &Ui, text: &imgui::ImStr, window_width: f32) {
+        let text_width = ui.calc_text_size(text, false, 0.0)[0];
         ui.set_cursor_pos([window_width / 2.0 - text_width / 2.0, ui.cursor_pos()[1]]);
-        ui.text(&text);
+        ui.text_wrapped(&text);
     }
 
     pub fn menu_height(&self) -> u32 {
@@ -282,5 +306,10 @@ impl GUI {
         MenuItem::new(&im_str!("{} ({}Hz)", name, item_speed))
             .build_with_ref(ui, &mut flag);
         if flag { *current_speed = item_speed; }
+    }
+
+    pub fn display_error(&mut self, message: &str) {
+        self.flag_error = true;
+        self.error_text = ImString::new(message);
     }
 }

@@ -107,13 +107,13 @@ impl Emulator {
                 self.cpu = CPU::new();
                 match self.cpu.load_rom(&rom) {
                     Ok(_) => { self.gui.set_flag_pause(false); },
-                    Err(_) => self.dialog_handler.open_error_message("Data is not a valid ROM!"),
+                    Err(_) => self.gui.display_error("Data is not a valid ROM!"),
                 }
             },
             LoadedType::State(state) => {
                 match CPU::from_state(&state) {
                     Ok(cpu) => self.cpu = cpu,
-                    Err(msg) => self.dialog_handler.open_error_message(&msg),
+                    Err(msg) => self.gui.display_error(&msg),
                 }
                 self.gui.set_flag_pause(false);
             },
@@ -167,7 +167,7 @@ impl Emulator {
                     // Blocking the event loop, but should be fine for ROM files which are very small in size
                     match self.download_rom(url) {
                         Ok(data) => self.load_rom(&data),
-                        Err(msg) => self.dialog_handler.open_error_message(&msg),
+                        Err(msg) => self.gui.display_error(&msg),
                     }
                 }
                 FileDialogResult::LoadState(file_path) => {
@@ -179,10 +179,10 @@ impl Emulator {
                     match self.cpu.save_state() {
                         Ok(state) => {
                             if fs::write(file_path, state).is_err() {
-                                self.dialog_handler.open_error_message("Failed to write to file!");
+                                self.gui.display_error("Failed to write to file!");
                             }
                         },
-                        Err(msg) => self.dialog_handler.open_error_message(&msg),
+                        Err(msg) => self.gui.display_error(&msg),
                     }
                 },
                 FileDialogResult::None => (),
