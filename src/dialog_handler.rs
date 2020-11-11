@@ -4,7 +4,6 @@ use getset::{CopyGetters, Getters};
 pub enum FileDialogType {
     OpenRom,
     InputUrl,
-    LoadState,
     SaveState,
 }
 
@@ -12,7 +11,6 @@ pub enum FileDialogResult {
     None,
     OpenRom(String),
     InputUrl(String),
-    LoadState(String),
     SaveState(String),
 }
 
@@ -59,11 +57,6 @@ impl DialogHandler {
                         if url.len() > 0 {
                             result = FileDialogResult::InputUrl(url);
                         }
-                    }
-                },
-                FileDialogType::LoadState => {
-                    if let Some(file_path) = tinyfiledialogs::open_file_dialog("Load State", "", Some((DialogHandler::STATE_FILTER_PATT, DialogHandler::STATE_FILTER_DESC))) {
-                        result = FileDialogResult::LoadState(file_path);
                     }
                 },
                 FileDialogType::SaveState => {

@@ -52,6 +52,7 @@ impl Emulator {
     const CPU_FREQUENCY: u16 = 720;
     const TIMER_FREQUENCY: u8 = 60;
     const NANOS_PER_TIMER: u64 = 1_000_000_000 / Emulator::TIMER_FREQUENCY as u64;
+    const MAX_FILE_SIZE: u16 = 8192;
 
     pub fn new(event_loop: &EventLoop<()>, vsync: bool) -> Result<Self, String> {
         let display = WindowDisplay::new(&event_loop, vsync)?;
@@ -159,8 +160,25 @@ impl Emulator {
         if self.dialog_handler.is_open() && self.dialog_handler.check_result() {
             match self.dialog_handler.last_result() {
                 FileDialogResult::OpenRom(file_path) => {
-                    if let Ok(file) = fs::read(&file_path) {
-                        self.load_rom(&file);
+                    match fs::metadata(&file_path) {
+                        Ok(metadata) => {
+                            if metadata.len() <= Self::MAX_FILE_SIZE as u64 {
+                                match fs::read(&file_path) {
+                                    Ok(file) => {
+                                        // Check if it's a p8s state file, otherwise expect ROM
+                                        if &file[0..3] == "p8s".as_bytes() {
+                                            self.load_state(&file[3..]);
+                                        } else {
+                                            self.load_rom(&file);
+                                        }
+                                    },
+                                    Err(err) => self.gui.display_error(&format!("Error: {}", err)),
+                                }
+                            } else {
+                                self.gui.display_error("File is too big!");
+                            }
+                        },
+                        Err(err) => self.gui.display_error(&format!("Error: {}", err)),
                     }
                 },
                 FileDialogResult::InputUrl(url) => {
@@ -170,14 +188,10 @@ impl Emulator {
                         Err(msg) => self.gui.display_error(&msg),
                     }
                 }
-                FileDialogResult::LoadState(file_path) => {
-                    if let Ok(file) = fs::read(&file_path) {
-                        self.load_state(&file);
-                    }
-                },
                 FileDialogResult::SaveState(file_path) => {
-                    match self.cpu.save_state() {
+                    match self.cpu.save_state().as_mut() {
                         Ok(state) => {
+                            state.splice(0..0, "p8s".as_bytes().iter().cloned());
                             if fs::write(file_path, state).is_err() {
                                 self.gui.display_error("Failed to write to file!");
                             }
@@ -251,17 +265,13 @@ impl Emulator {
             pause = true;
         }
 
-        if self.gui.flag_open_rom() {
+        if self.gui.flag_open() {
             self.dialog_handler.open_file_dialog(FileDialogType::OpenRom);
-            self.gui.set_flag_open_rom(false);
+            self.gui.set_flag_open(false);
         }
         if self.gui.flag_open_rom_url() {
             self.dialog_handler.open_file_dialog(FileDialogType::InputUrl);
             self.gui.set_flag_open_rom_url(false);
-        }
-        if self.gui.flag_load_state() {
-            self.dialog_handler.open_file_dialog(FileDialogType::LoadState);
-            self.gui.set_flag_load_state(false);
         }
         if self.gui.flag_save_state() {
             self.dialog_handler.open_file_dialog(FileDialogType::SaveState);
@@ -345,8 +355,7 @@ impl Emulator {
                 (_, P, Pressed, _, _) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
                 (_, M, Pressed, _, _) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
                 (_, O, Pressed, true, true) => { self.gui.set_flag_open_rom_url(true); },
-                (_, O, Pressed, true, _) => { self.gui.set_flag_open_rom(true); },
-                (_, L, Pressed, true, _) => { self.gui.set_flag_load_state(true); },
+                (_, O, Pressed, true, _) => { self.gui.set_flag_open(true); },
                 (_, S, Pressed, true, _) => { self.gui.set_flag_save_state(true); },
 
                 // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
