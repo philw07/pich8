@@ -4,6 +4,7 @@ use crate::gui::GUI;
 use crate::sound::BeepSound;
 use crate::dialog_handler::{DialogHandler, FileDialogResult, FileDialogType};
 use crate::fps_counter::FpsCounter;
+use crate::rom_downloader::{RomDownloader, DownloadResult};
 use std::{time::Instant, fs};
 use bitvec::prelude::*;
 use glium::{
@@ -46,6 +47,7 @@ pub struct Emulator {
     pause_time: Instant,
     dialog_handler: DialogHandler,
     modifiers_state: ModifiersState,
+    rom_downloader: RomDownloader,
 }
 
 impl Emulator {
@@ -99,6 +101,7 @@ impl Emulator {
             dialog_handler: DialogHandler::new(),
             fps_counter: FpsCounter::new(),
             modifiers_state: ModifiersState::empty(),
+            rom_downloader: RomDownloader::new(),
         })
     }
 
@@ -130,17 +133,6 @@ impl Emulator {
     pub fn load_state(&mut self, state: &[u8]) {
         self.loaded = LoadedType::State(state.to_vec());
         self.reset();
-    }
-
-    fn download_rom(&self, url: &str) -> Result<Vec<u8>, String> {
-        let fail_text = "Failed to download data!";
-        let url = url::Url::parse(url).map_err(|_| "Invalid URL!")?;
-        let resp = reqwest::blocking::get(url).map_err(|_| fail_text)?;
-        if resp.status().is_success() {
-            Ok(resp.bytes().map_err(|_| fail_text)?.to_vec())
-        } else {
-            Err(fail_text.to_string())
-        }
     }
 
     fn set_pause(&mut self, pause: bool) {
@@ -182,10 +174,10 @@ impl Emulator {
                     }
                 },
                 FileDialogResult::InputUrl(url) => {
-                    // Blocking the event loop, but should be fine for ROM files which are very small in size
-                    match self.download_rom(&url) {
-                        Ok(data) => self.load_rom(&data),
-                        Err(msg) => self.gui.display_error(&msg),
+                    self.gui.set_flag_downloading(true);
+                    match url::Url::parse(&url) {
+                        Ok(url) => self.rom_downloader.download(url),
+                        Err(e) => self.gui.display_error(&format!("Invalid URL: {}", e)),    
                     }
                 }
                 FileDialogResult::SaveState(file_path) => {
@@ -200,6 +192,21 @@ impl Emulator {
                     }
                 },
                 FileDialogResult::None => (),
+            }
+        }
+
+        // Handle downloads
+        if self.rom_downloader.is_active() {
+            match self.rom_downloader.check_result() {
+                DownloadResult::Success(data) => {
+                    self.gui.set_flag_downloading(false);
+                    self.load_rom(&data);
+                },
+                DownloadResult::Fail(msg) => {
+                    self.gui.set_flag_downloading(false);
+                    self.gui.display_error(&msg);
+                },
+                DownloadResult::None => (),
             }
         }
 

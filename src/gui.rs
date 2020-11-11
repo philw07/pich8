@@ -58,6 +58,8 @@ pub struct GUI {
     flag_about: bool,
     flag_error: bool,
     error_text: ImString,
+    #[getset(get_copy = "pub", set = "pub")]
+    flag_downloading: bool,
 }
 
 impl GUI {
@@ -123,6 +125,7 @@ impl GUI {
             flag_about: false,
             flag_error: false,
             error_text: ImString::new(""),
+            flag_downloading: false,
         }
     }
 
@@ -219,6 +222,27 @@ impl GUI {
                 let text_width = ui.calc_text_size(&fps, false, 0.0);
                 ui.same_line(window_width as f32 - (text_width[0] * 1.25));
                 ui.text_colored([0.75, 0.75, 0.75, 1.0], fps);
+            }
+            if self.flag_downloading {
+                self.is_open = true;
+                let text = im_str!("Downloading...");
+                let text_size = ui.calc_text_size(text, false, 250.0);
+                let dl_win_size = [text_size[0] + 50.0, text_size[1] + 40.0];
+                let dl_win_pos = [
+                    window_width as f32 / 2.0 - dl_win_size[0] / 2.0,
+                    window_height as f32 / 2.0 - dl_win_size[1] / 2.0
+                ];
+                Window::new(im_str!("Downloading"))
+                    .position(dl_win_pos, Condition::Always)
+                    .size(dl_win_size, Condition::Always)
+                    .resizable(false)
+                    .collapsible(false)
+                    .movable(false)
+                    .title_bar(false)
+                    .build(&ui, || {
+                        ui.set_cursor_pos([dl_win_size[0] / 2.0 - text_size[0] / 2.0, dl_win_size[1] / 2.0 - text_size[1] / 2.0]);
+                        ui.text_wrapped(&text);
+                    });
             }
             if self.flag_about {
                 self.is_open = true;

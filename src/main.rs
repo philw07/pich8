@@ -9,6 +9,7 @@ mod serde_big_array;
 mod dialog_handler;
 mod fps_counter;
 mod video_memory;
+mod rom_downloader;
 
 use std::env;
 use getopts::Options;
