@@ -21,8 +21,6 @@ pub enum FileDialogResult {
 pub struct DialogHandler {
     #[getset(get_copy = "pub")]
     is_open: bool,
-    #[getset(get = "pub")]
-    last_result: FileDialogResult,
     chan_rx: Option<Receiver<FileDialogResult>>,
 }
 
@@ -33,7 +31,6 @@ impl DialogHandler {
     pub fn new() -> Self {
         Self {
             is_open: false,
-            last_result: FileDialogResult::None,
             chan_rx: None,
         }
     }
@@ -70,14 +67,13 @@ impl DialogHandler {
         });
     }
 
-    pub fn check_result(&mut self) -> bool {
-        let mut result = false;
+    pub fn check_result(&mut self) -> FileDialogResult {
+        let mut result = FileDialogResult::None;
         if self.chan_rx.is_some() {
             if let Some(chan) = self.chan_rx.as_ref() {
                 if let Ok(dialog_result) = chan.try_recv() {
-                    self.last_result = dialog_result;
                     self.is_open = false;
-                    result = true;
+                    result = dialog_result;
                 }
             }
         }

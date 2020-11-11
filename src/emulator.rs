@@ -157,8 +157,8 @@ impl Emulator {
 
     pub fn handle_event(&mut self, event: Event<()>, ctrl_flow: &mut ControlFlow) {
         // Handle file dialogs
-        if self.dialog_handler.is_open() && self.dialog_handler.check_result() {
-            match self.dialog_handler.last_result() {
+        if self.dialog_handler.is_open() {
+            match self.dialog_handler.check_result() {
                 FileDialogResult::OpenRom(file_path) => {
                     match fs::metadata(&file_path) {
                         Ok(metadata) => {
@@ -183,7 +183,7 @@ impl Emulator {
                 },
                 FileDialogResult::InputUrl(url) => {
                     // Blocking the event loop, but should be fine for ROM files which are very small in size
-                    match self.download_rom(url) {
+                    match self.download_rom(&url) {
                         Ok(data) => self.load_rom(&data),
                         Err(msg) => self.gui.display_error(&msg),
                     }
