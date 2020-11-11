@@ -81,7 +81,7 @@ impl WindowDisplay {
 
     pub fn prepare(&mut self, vmem: &VideoMemory, menu_height: u32) -> Result<Frame, String> {
         // Copy over new frame
-        for idx in 0..vmem.width()*vmem.height() {
+        for idx in 0..vmem.render_width()*vmem.render_height() {
             let buf_idx = idx * 3;
             if vmem[idx] {
                 self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.fg_color);
@@ -89,12 +89,12 @@ impl WindowDisplay {
                 self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.bg_color);
             }
         }
-        let frame_len = vmem.width() * vmem.height() * 3;
+        let frame_len = vmem.render_width() * vmem.render_height() * 3;
 
         // Prepare texture
         let mut frame = self.display.draw();
         frame.clear_color(self.bg_color[0] as f32 / 255.0, self.bg_color[1] as f32 / 255.0, self.bg_color[2] as f32 / 255.0, 1.0);
-        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..frame_len], (vmem.width() as u32, vmem.height() as u32));
+        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..frame_len], (vmem.render_width() as u32, vmem.render_height() as u32));
         let texture = Texture2d::new(&self.display, img)
             .map_err(|e| format!("Failed to create texture: {}", e))?;
 

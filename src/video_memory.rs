@@ -39,11 +39,21 @@ impl VideoMemory {
     }
 
     pub fn set(&mut self, x: usize, y: usize, value: bool) {
-        self.set_index(self.get_index(x, y), value);
+        // In default video mode, we're translating the 64x32 screen to 128x64,
+        // only this way the scroll commands work correctly in S-CHIP low res mode.
+        if self.video_mode == VideoMode::Default {
+            let (x, y) = (x * 2, y * 2);
+            self.set_index(self.get_index(x, y), value);
+            self.set_index(self.get_index(x+1, y), value);
+            self.set_index(self.get_index(x, y+1), value);
+            self.set_index(self.get_index(x+1, y+1), value);
+        } else {
+            self.set_index(self.get_index(x, y), value);
+        }
     }
 
     fn set_index(&mut self, index: usize, value: bool) {
-        if index >= self.width() * self.height() {
+        if index >= self.render_width() * self.render_height() {
             panic!("Index out of bounds");
         }
         self.vmem[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value);
@@ -75,43 +85,63 @@ impl VideoMemory {
         }
     }
 
+    /// Returns the render width.
+    /// This differs from the actual screen width as in Default mode we render in Extended size to support S-CHIP low res commands (e.g. scrolling down "half-pixels").
+    pub fn render_width(&self) -> usize {
+        match self.video_mode {
+            VideoMode::Default | VideoMode::Extended => Self::WIDTH_EXTENDED,
+            VideoMode::HiRes => Self::WIDTH_HIRES,
+        }
+    }
+
+    /// Returns the render height.
+    /// This differs from the actual screen height as in Default mode we render in Extended size to support S-CHIP low res commands (e.g. scrolling down "half-pixels").
+    pub fn render_height(&self) -> usize {
+        match self.video_mode {
+            VideoMode::Default | VideoMode::Extended => Self::HEIGHT_EXTENDED,
+            VideoMode::HiRes => Self::HEIGHT_HIRES,
+        }
+    }
+
     pub fn get_index(&self, x: usize, y: usize) -> usize {
-        y * self.width() + x
+        y * self.render_width() + x
     }
 
     pub fn get(&self, x: usize, y:usize) -> bool {
-        self[self.get_index(x, y)]
+        if self.video_mode == VideoMode::Default {
+            let (x, y) = (x * 2, y * 2);
+            self[self.get_index(x, y)]
+        } else {
+            self[self.get_index(x, y)]
+        }
     }
 
     pub fn scroll_down(&mut self, lines: usize) {
-        // In default video mode (64x32), only half the lines are scrolled.
-        // In case of an odd number, the scroll is performed with a half pixel shift, however the current implementation doesn't allow that.
-        // Source: CHIP8.DOC by David Winter
-        let lines = if self.video_mode == VideoMode::Extended { lines } else { lines / 2 };
-        for y in (0..self.height()).rev() {
-            for x in 0..self.width() {
+        for y in (0..self.render_height()).rev() {
+            for x in 0..self.render_width() {
                 let val = if y < lines { false } else { self.get(x, y - lines) };
-                self.set(x, y, val);
+                // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                self.set_index(self.get_index(x, y), val);
             }
         }
     }
 
     pub fn scroll_left(&mut self) {
-        let num = if self.video_mode == VideoMode::Extended { 4 } else { 2 };
-        for x in 0..self.width() {
-            for y in 0..self.height() {
-                let val = if x >= self.width() - num { false } else { self.get(x + num, y) };
-                self.set(x, y, val);
+        for x in 0..self.render_width() {
+            for y in 0..self.render_height() {
+                let val = if x >= self.width() - 4 { false } else { self.get(x + 4, y) };
+                // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                self.set_index(self.get_index(x, y), val);
             }
         }
     }
 
     pub fn scroll_right(&mut self) {
-        let num = if self.video_mode == VideoMode::Extended { 4 } else { 2 };
-        for x in (0..self.width()).rev() {
-            for y in 0..self.height() {
-                let val = if x < num { false } else { self.get(x - num, y) };
-                self.set(x, y, val);
+        for x in (0..self.render_width()).rev() {
+            for y in 0..self.render_height() {
+                let val = if x < 4 { false } else { self.get(x - 4, y) };
+                // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                self.set_index(self.get_index(x, y), val);
             }
         }
     }
@@ -121,7 +151,7 @@ impl Index<usize> for VideoMemory {
     type Output = bool;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.width() * self.height() {
+        if index >= self.render_width() * self.render_height() {
             panic!("Index out of bounds");
         }
 
@@ -148,21 +178,20 @@ mod video_memory_test {
         assert_eq!(vmem.video_mode, VideoMode::Default);
         assert_eq!(vmem.width(), 64);
         assert_eq!(vmem.height(), 32);
+        assert_eq!(vmem.render_width(), 128);
+        assert_eq!(vmem.render_height(), 64);
         vmem.set_video_mode(VideoMode::HiRes);
         assert_eq!(vmem.video_mode, VideoMode::HiRes);
         assert_eq!(vmem.width(), 64);
         assert_eq!(vmem.height(), 64);
+        assert_eq!(vmem.render_width(), 64);
+        assert_eq!(vmem.render_height(), 64);
         vmem.set_video_mode(VideoMode::Extended);
         assert_eq!(vmem.video_mode, VideoMode::Extended);
         assert_eq!(vmem.width(), 128);
         assert_eq!(vmem.height(), 64);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_get_index_out_of_bounds_default() {
-        let vmem = VideoMemory::new();
-        let _ = vmem[64*32];
+        assert_eq!(vmem.render_width(), 128);
+        assert_eq!(vmem.render_height(), 64);
     }
 
     #[test]
@@ -175,7 +204,7 @@ mod video_memory_test {
 
     #[test]
     #[should_panic]
-    fn test_get_index_out_of_bounds_extended() {
+    fn test_get_index_out_of_bounds_default_and_extended() {
         let mut vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::Extended);
         let _ = vmem[128*64];
