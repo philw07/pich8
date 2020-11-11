@@ -306,7 +306,13 @@ impl CPU {
     // 0xFX1E - I += Vx
     #[inline]
     pub(super) fn opcode_0xFX1E(&mut self, x: usize) {
+        // I was quite puzzled as the ROM Spacefight2091! wasn't working correctly and weird graphics issues occurred.
+        // After some research, I found the answer using the test ROM "SCTEST" (Description: https://github.com/Rubenknex/Chip-8/blob/master/sctest.txt).
+        // The error that occured is "Error 24" which describes an undocumented feature in this opcode setting VF to 1 if I overflows.
         self.I += self.V[x] as u16;
+        if self.I as usize >= self.mem.len() {
+            self.V[0xF] = 1;
+        }
         self.PC += 2;
     }
 
