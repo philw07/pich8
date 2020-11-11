@@ -12,13 +12,15 @@ mod opcodes;
 pub enum Error {
     SaveStateError(rmp_serde::encode::Error),
     LoadStateError(rmp_serde::decode::Error),
+    ProgramCounterOverflow,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Error::SaveStateError(e) => write!(f, "save state error: {}", e),
-            Error::LoadStateError(e) => write!(f, "load state error: {}", e),
+            Error::SaveStateError(e) => write!(f, "Save state error: {}", e),
+            Error::LoadStateError(e) => write!(f, "Load state error: {}", e),
+            Error::ProgramCounterOverflow => write!(f, "Program counter overflow"),
         }
     }
 }
@@ -176,7 +178,7 @@ impl CPU {
         }
     }
 
-    pub fn tick(&mut self, keys: &BitArray<Msb0, [u16; 1]>) {
+    pub fn tick(&mut self, keys: &BitArray<Msb0, [u16; 1]>) -> Result<(), Error> {
         self.keys.copy_from_bitslice(keys);
         if self.key_wait {
             for i in 0..keys.len() {
@@ -188,12 +190,18 @@ impl CPU {
         }
 
         if !self.key_wait {
-            self.emulate_cycle();
+            self.emulate_cycle()
+        } else {
+            Ok(())
         }
     }
 
-    fn emulate_cycle(&mut self) {
+    fn emulate_cycle(&mut self) -> Result<(), Error> {
         // Fetch opcode
+        if self.PC as usize >= self.mem.len() - 1 {
+            self.load_bootrom();
+            return Err(Error::ProgramCounterOverflow);
+        }
         self.opcode = (self.mem[self.PC as usize] as u16) << 8 | (self.mem[(self.PC + 1) as usize] as u16);
 
         // Decode opcode
@@ -272,7 +280,8 @@ impl CPU {
                     _ => self.opcode_invalid(),
             },
             _ => self.opcode_invalid(),
-        }
+        };
+        Ok(())
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {

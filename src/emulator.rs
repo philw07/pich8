@@ -218,7 +218,9 @@ impl Emulator {
                             let cycles = (self.last_cycle.elapsed().as_nanos() as f64 / nanos_per_cycle as f64) as u64;
                             self.last_cycle = Instant::now();
                             for _ in 0..cycles {
-                                self.cpu.tick(&self.input);
+                                if let Err(e) = self.cpu.tick(&self.input) {
+                                    self.gui.display_error(&format!("Error: {}", e));
+                                }
                             }
                         }
                         // Update CPU timers
