@@ -174,8 +174,8 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_0x8XY4(&mut self, x: usize, y: usize) {
         let res = self.V[x] as u16 + self.V[y] as u16;
-        self.V[0xF] = if res > 0xFF { 1 } else { 0 };
-        self.V[x] = res as u8;
+        let vf = if res > 0xFF { 1 } else { 0 };
+        self.write_vf(x, res as u8, vf);
         self.PC += 2;
     }
 
@@ -183,8 +183,8 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_0x8XY5(&mut self, x: usize, y: usize) {
         let res = self.V[x] as i16 - self.V[y] as i16;
-        self.V[0xF] = if res < 0 { 0 } else { 1 };
-        self.V[x] = res as u8;
+        let vf = if res < 0 { 0 } else { 1 };
+        self.write_vf(x, res as u8, vf);
         self.PC += 2;
     }
 
@@ -194,11 +194,9 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_0x8XY6(&mut self, x: usize, y: usize) {
         if self.quirk_shift {
-            self.V[0xF] = self.V[x] & 1;
-            self.V[x] >>= 1;
+            self.write_vf(x, self.V[x] >> 1, self.V[x] & 1);
         } else {
-            self.V[0xF] = self.V[y] & 1;
-            self.V[x] = self.V[y] >> 1
+            self.write_vf(x, self.V[y] >> 1, self.V[y] & 1);
         }
         self.PC += 2;
     }
@@ -207,8 +205,8 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_0x8XY7(&mut self, x: usize, y: usize) {
         let res = self.V[y] as i16 - self.V[x] as i16;
-        self.V[0xF] = if res < 0 { 0 } else { 1 };
-        self.V[x] = res as u8;
+        let vf = if res < 0 { 0 } else { 1 };
+        self.write_vf(x, res as u8, vf);
         self.PC += 2;
     }
 
@@ -218,11 +216,9 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_0x8XYE(&mut self, x: usize, y: usize) {
         if self.quirk_shift {
-            self.V[0xF] = (self.V[x] & 0x80) >> 7;
-            self.V[x] <<= 1;
+            self.write_vf(x, self.V[x] << 1, (self.V[x] & 0x80) >> 7);
         } else {
-            self.V[0xF] = (self.V[y] & 0x80) >> 7;
-            self.V[x] = self.V[y] << 1;
+            self.write_vf(x, self.V[y] << 1, (self.V[y] & 0x80) >> 7);
         }
         self.PC += 2;
     }
@@ -240,10 +236,10 @@ impl CPU {
         self.PC += 2;
     }
 
-    // 0xBNNN - PC = nnn
+    // 0xBNNN - PC = nnn + V0
     #[inline]
     pub(super) fn opcode_0xBNNN(&mut self, nnn: u16) {
-        self.PC = self.V[0] as u16 + nnn;
+        self.PC = nnn + if self.quirk_jump { self.V[(nnn >> 8 & 0xF) as usize] } else { self.V[0] } as u16;
     }
 
     // 0xCXNN - Vx = rand() & nn
@@ -382,5 +378,15 @@ impl CPU {
     pub(super) fn opcode_schip_0xFX85(&mut self, x: usize) {
         self.V[..=x].copy_from_slice(&self.RPL[..=x]);
         self.PC += 2;
+    }
+
+    fn write_vf(&mut self, reg: usize, value: u8, vf: u8) {
+        if self.quirk_vf_order {
+            self.V[reg] = value;
+            self.V[0xF] = vf;
+        } else {
+            self.V[0xF] = vf;
+            self.V[reg] = value;
+        }
     }
 }

@@ -64,6 +64,10 @@ pub struct CPU {
     quirk_load_store: bool,                 // Flag for load store quirk
     #[getset(get_copy = "pub", set = "pub")]
     quirk_shift: bool,                      // Flag for shift quirk
+    #[getset(get_copy = "pub", set = "pub")]
+    quirk_jump: bool,                       // Flag for jump0 quirk
+    #[getset(get_copy = "pub", set = "pub")]
+    quirk_vf_order: bool,                   // Flag for VF order quirk
     // Originally, a 16x16 sprite is only drawn if n == 0 AND extended display mode (128x64) is active (CHIP8.DOC by David Winter).
     // In default mode (64x32) however, if n (height) == 0, a 8x16 pixels sprite is drawn.
     // However, Octo and many other emulators only check for n == 0, so some ROMs (e.g. Eaty the Alien) assume this check instead.
@@ -131,6 +135,8 @@ impl CPU {
             quirk_load_store: true,
             quirk_shift: true,
             quirk_draw: true,
+            quirk_jump: true,
+            quirk_vf_order: true,
             vertical_wrapping: true,
         };
         

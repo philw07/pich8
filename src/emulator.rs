@@ -67,6 +67,8 @@ impl Emulator {
         gui.set_flag_quirk_load_store(cpu.quirk_load_store());
         gui.set_flag_quirk_shift(cpu.quirk_shift());
         gui.set_flag_quirk_draw(cpu.quirk_draw());
+        gui.set_flag_quirk_jump(cpu.quirk_jump());
+        gui.set_flag_quirk_vf_order(cpu.quirk_vf_order());
         gui.set_flag_vertical_wrapping(cpu.vertical_wrapping());
         gui.set_cpu_speed(cpu_speed);
 
@@ -318,6 +320,8 @@ impl Emulator {
         self.cpu.set_quirk_load_store(self.gui.flag_quirk_load_store());
         self.cpu.set_quirk_shift(self.gui.flag_quirk_shift());
         self.cpu.set_quirk_draw(self.gui.flag_quirk_draw());
+        self.cpu.set_quirk_jump(self.gui.flag_quirk_jump());
+        self.cpu.set_quirk_vf_order(self.gui.flag_quirk_vf_order());
         self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
         self.mute = self.gui.flag_mute();
 
