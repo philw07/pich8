@@ -42,7 +42,8 @@ pub struct GUI {
     #[getset(get_copy = "pub", set = "pub")]
     flag_pause: bool,
     #[getset(get_copy = "pub", set = "pub")]
-    cpu_speed: u16,
+    cpu_speed: u32,
+    cpu_multiplier: u32,
 
     #[getset(get_copy = "pub", set = "pub")]
     flag_quirk_load_store: bool,
@@ -119,6 +120,7 @@ impl GUI {
             flag_pause: false,
 
             cpu_speed: 0,
+            cpu_multiplier: 1,
 
             flag_quirk_load_store: false,
             flag_quirk_shift: false,
@@ -191,12 +193,24 @@ impl GUI {
                     .build_with_ref(&ui, &mut self.flag_pause);
                 ui.separator();
                 if let Some(cpu_speed_menu) = ui.begin_menu(im_str!("CPU Speed"), true) {
-                    GUI::cpu_speed_menu_item(&ui, "Slowest", 420, &mut self.cpu_speed);
-                    GUI::cpu_speed_menu_item(&ui, "Slow", 600, &mut self.cpu_speed);
-                    GUI::cpu_speed_menu_item(&ui, "Normal", 720, &mut self.cpu_speed);
-                    GUI::cpu_speed_menu_item(&ui, "Fast", 900, &mut self.cpu_speed);
-                    GUI::cpu_speed_menu_item(&ui, "Faster", 1200, &mut self.cpu_speed);
-                    GUI::cpu_speed_menu_item(&ui, "Fastest", 1500, &mut self.cpu_speed);
+                    GUI::cpu_speed_menu_item(&ui, "Slowest", 420 * self.cpu_multiplier, &mut self.cpu_speed);
+                    GUI::cpu_speed_menu_item(&ui, "Slow", 600 * self.cpu_multiplier, &mut self.cpu_speed);
+                    GUI::cpu_speed_menu_item(&ui, "Normal", 720 * self.cpu_multiplier, &mut self.cpu_speed);
+                    GUI::cpu_speed_menu_item(&ui, "Fast", 900 * self.cpu_multiplier, &mut self.cpu_speed);
+                    GUI::cpu_speed_menu_item(&ui, "Faster", 1200 * self.cpu_multiplier, &mut self.cpu_speed);
+                    GUI::cpu_speed_menu_item(&ui, "Fastest", 1500 * self.cpu_multiplier, &mut self.cpu_speed);
+                    ui.separator();
+                    let before = self.cpu_multiplier == 50;
+                    let mut after = before;
+                    MenuItem::new(&im_str!("50x"))
+                        .build_with_ref(&ui, &mut after);
+                    if !before && after {
+                        self.cpu_multiplier = 50;
+                        self.cpu_speed *= 50;
+                    } else if before && !after {
+                        self.cpu_multiplier = 1;
+                        self.cpu_speed /= 50;
+                    }
                     cpu_speed_menu.end(&ui);
                 }
                 if let Some(quirks_menu) = ui.begin_menu(im_str!("Quirks"), true) {
@@ -328,7 +342,7 @@ impl GUI {
         self.last_menu_height
     }
 
-    fn cpu_speed_menu_item(ui: &Ui, name: &str, item_speed: u16, current_speed: &mut u16) {
+    fn cpu_speed_menu_item(ui: &Ui, name: &str, item_speed: u32, current_speed: &mut u32) {
         let mut flag = *current_speed == item_speed;
         MenuItem::new(&im_str!("{} ({}Hz)", name, item_speed))
             .build_with_ref(ui, &mut flag);

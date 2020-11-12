@@ -32,7 +32,7 @@ enum LoadedType {
 
 pub struct Emulator {
     cpu: CPU,
-    cpu_speed: u16,
+    cpu_speed: u32,
     display: WindowDisplay,
     gui: GUI,
     sound: BeepSound,
@@ -60,7 +60,7 @@ impl Emulator {
         let display = WindowDisplay::new(&event_loop, vsync)?;
         let mut cpu = CPU::new();
         cpu.load_bootrom();
-        let cpu_speed = Emulator::CPU_FREQUENCY;
+        let cpu_speed = Emulator::CPU_FREQUENCY as u32;
 
         // Initialize GUI
         let mut gui = GUI::new(display.display());
@@ -316,7 +316,7 @@ impl Emulator {
             (fg_color[2] * 255.0) as u8
         ]);
 
-        self.cpu_speed = self.gui.cpu_speed();
+        self.cpu_speed = self.gui.cpu_speed() as u32;
         self.cpu.set_quirk_load_store(self.gui.flag_quirk_load_store());
         self.cpu.set_quirk_shift(self.gui.flag_quirk_shift());
         self.cpu.set_quirk_draw(self.gui.flag_quirk_draw());
