@@ -4,7 +4,6 @@ use crate::gui::GUI;
 use crate::sound::BeepSound;
 use crate::dialog_handler::{DialogHandler, FileDialogResult, FileDialogType};
 use crate::fps_counter::FpsCounter;
-use crate::rom_downloader::{RomDownloader, DownloadResult};
 use std::{time::Instant, fs};
 use bitvec::prelude::*;
 use glium::{
@@ -23,6 +22,9 @@ use glium::{
         },
     },
 };
+
+#[cfg(feature = "rom-download")]
+use crate::rom_downloader::{RomDownloader, DownloadResult};
 
 enum LoadedType {
     Nothing,
@@ -47,6 +49,8 @@ pub struct Emulator {
     pause_time: Instant,
     dialog_handler: DialogHandler,
     modifiers_state: ModifiersState,
+
+    #[cfg(feature = "rom-download")]
     rom_downloader: RomDownloader,
 }
 
@@ -103,6 +107,8 @@ impl Emulator {
             dialog_handler: DialogHandler::new(),
             fps_counter: FpsCounter::new(),
             modifiers_state: ModifiersState::empty(),
+
+            #[cfg(feature = "rom-download")]
             rom_downloader: RomDownloader::new(),
         })
     }
@@ -149,6 +155,23 @@ impl Emulator {
         }
     }
 
+    #[cfg(feature = "rom-download")]
+    fn handle_downloads(&mut self) {
+        if self.rom_downloader.is_active() {
+            match self.rom_downloader.check_result() {
+                DownloadResult::Success(data) => {
+                    self.gui.set_flag_downloading(false);
+                    self.load_rom(&data);
+                },
+                DownloadResult::Fail(msg) => {
+                    self.gui.set_flag_downloading(false);
+                    self.gui.display_error(&msg);
+                },
+                DownloadResult::None => (),
+            }
+        }
+    }
+
     pub fn handle_event(&mut self, event: Event<()>, ctrl_flow: &mut ControlFlow) {
         // Handle file dialogs
         if self.dialog_handler.is_open() {
@@ -175,13 +198,6 @@ impl Emulator {
                         Err(err) => self.gui.display_error(&format!("Error: {}", err)),
                     }
                 },
-                FileDialogResult::InputUrl(url) => {
-                    self.gui.set_flag_downloading(true);
-                    match url::Url::parse(&url) {
-                        Ok(url) => self.rom_downloader.download(url),
-                        Err(e) => self.gui.display_error(&format!("Invalid URL: {}", e)),    
-                    }
-                }
                 FileDialogResult::SaveState(file_path) => {
                     match self.cpu.save_state().as_mut() {
                         Ok(state) => {
@@ -193,24 +209,23 @@ impl Emulator {
                         Err(msg) => self.gui.display_error(&msg),
                     }
                 },
+
+                #[cfg(feature = "rom-download")]
+                FileDialogResult::InputUrl(url) => {
+                    self.gui.set_flag_downloading(true);
+                    match url::Url::parse(&url) {
+                        Ok(url) => self.rom_downloader.download(url),
+                        Err(e) => self.gui.display_error(&format!("Invalid URL: {}", e)),    
+                    }
+                }
+
                 FileDialogResult::None => (),
             }
         }
 
         // Handle downloads
-        if self.rom_downloader.is_active() {
-            match self.rom_downloader.check_result() {
-                DownloadResult::Success(data) => {
-                    self.gui.set_flag_downloading(false);
-                    self.load_rom(&data);
-                },
-                DownloadResult::Fail(msg) => {
-                    self.gui.set_flag_downloading(false);
-                    self.gui.display_error(&msg);
-                },
-                DownloadResult::None => (),
-            }
-        }
+        #[cfg(feature = "rom-download")]
+        self.handle_downloads();
 
         // Handle events
         if !self.dialog_handler.is_open() {
@@ -280,10 +295,13 @@ impl Emulator {
             self.dialog_handler.open_file_dialog(FileDialogType::OpenRom);
             self.gui.set_flag_open(false);
         }
+
+        #[cfg(feature = "rom-download")]
         if self.gui.flag_open_rom_url() {
             self.dialog_handler.open_file_dialog(FileDialogType::InputUrl);
             self.gui.set_flag_open_rom_url(false);
         }
+
         if self.gui.flag_save_state() {
             self.dialog_handler.open_file_dialog(FileDialogType::SaveState);
             self.gui.set_flag_save_state(false);
@@ -367,7 +385,10 @@ impl Emulator {
                 (_, F5, Pressed, _, _) => { self.gui.set_flag_reset(true); },
                 (_, P, Pressed, _, _) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
                 (_, M, Pressed, _, _) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
+
+                #[cfg(feature = "rom-download")]
                 (_, O, Pressed, true, true) => { self.gui.set_flag_open_rom_url(true); },
+                
                 (_, O, Pressed, true, _) => { self.gui.set_flag_open(true); },
                 (_, S, Pressed, true, _) => { self.gui.set_flag_save_state(true); },
 

@@ -9,6 +9,8 @@ mod serde_big_array;
 mod dialog_handler;
 mod fps_counter;
 mod video_memory;
+
+#[cfg(feature = "rom-download")]
 mod rom_downloader;
 
 use std::env;

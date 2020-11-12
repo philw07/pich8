@@ -3,15 +3,19 @@ use getset::{CopyGetters, Getters};
 
 pub enum FileDialogType {
     OpenRom,
-    InputUrl,
     SaveState,
+    
+    #[cfg(feature = "rom-download")]
+    InputUrl,
 }
 
 pub enum FileDialogResult {
     None,
     OpenRom(String),
-    InputUrl(String),
     SaveState(String),
+
+    #[cfg(feature = "rom-download")]
+    InputUrl(String),
 }
 
 /// This module handles dialogs in a separate thread.
@@ -49,16 +53,18 @@ impl DialogHandler {
                         result = FileDialogResult::OpenRom(file_path);
                     }
                 },
+                FileDialogType::SaveState => {
+                    if let Some(file_path) = tinyfiledialogs::save_file_dialog_with_filter("Save State", "", DialogHandler::STATE_FILTER_PATT, DialogHandler::STATE_FILTER_DESC) {
+                        result = FileDialogResult::SaveState(if file_path.contains(".") { file_path } else { format!("{}.p8s", file_path) });
+                    }
+                },
+                
+                #[cfg(feature = "rom-download")]
                 FileDialogType::InputUrl => {
                     if let Some(url) = tinyfiledialogs::input_box("Input ROM URL", "Please input the URL pointing to the ROM file.\nFor Github, please make sure to use the raw file link!", "") {
                         if url.len() > 0 {
                             result = FileDialogResult::InputUrl(url);
                         }
-                    }
-                },
-                FileDialogType::SaveState => {
-                    if let Some(file_path) = tinyfiledialogs::save_file_dialog_with_filter("Save State", "", DialogHandler::STATE_FILTER_PATT, DialogHandler::STATE_FILTER_DESC) {
-                        result = FileDialogResult::SaveState(if file_path.contains(".") { file_path } else { format!("{}.p8s", file_path) });
                     }
                 },
             }

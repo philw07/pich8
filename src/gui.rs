@@ -22,8 +22,11 @@ pub struct GUI {
     // Flags
     #[getset(get_copy = "pub", set = "pub")]
     flag_open: bool,
+
+    #[cfg(feature = "rom-download")]
     #[getset(get_copy = "pub", set = "pub")]
     flag_open_rom_url: bool,
+
     #[getset(get_copy = "pub", set = "pub")]
     flag_save_state: bool,
     #[getset(get_copy = "pub", set = "pub")]
@@ -107,7 +110,10 @@ impl GUI {
             is_open: false,
 
             flag_open: false,
+
+            #[cfg(feature = "rom-download")]
             flag_open_rom_url: false,
+
             flag_save_state: false,
             flag_reset: false,
             flag_exit: false,
@@ -157,9 +163,12 @@ impl GUI {
                 MenuItem::new(im_str!("Open ROM or State..."))
                     .shortcut(im_str!("Ctrl + O"))
                     .build_with_ref(&ui, &mut self.flag_open);
+
+                #[cfg(feature = "rom-download")]
                 MenuItem::new(im_str!("Open ROM from URL..."))
                     .shortcut(im_str!("Ctrl + Shift + O"))
                     .build_with_ref(&ui, &mut self.flag_open_rom_url);
+                    
                 MenuItem::new(im_str!("Save State..."))
                 .shortcut(im_str!("Ctrl + S"))
                     .build_with_ref(&ui, &mut self.flag_save_state);
