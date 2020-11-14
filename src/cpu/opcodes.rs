@@ -237,6 +237,8 @@ impl CPU {
     }
 
     // 0xBNNN - PC = nnn + V0
+    // Original: PC = nnn + V0
+    // Quirk:    PC = xnn + Vx
     #[inline]
     pub(super) fn opcode_0xBNNN(&mut self, nnn: u16) {
         self.PC = nnn + if self.quirk_jump { self.V[(nnn >> 8 & 0xF) as usize] } else { self.V[0] } as u16;

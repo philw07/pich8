@@ -1,4 +1,4 @@
-use crate::cpu::CPU;
+use crate::cpu::{CPU, Breakpoint};
 use crate::display::WindowDisplay;
 use crate::gui::GUI;
 use crate::sound::BeepSound;
@@ -43,6 +43,8 @@ pub struct Emulator {
     input: BitArray<Msb0, [u16; 1]>,
     loaded: LoadedType,
     pause: bool,
+    step: bool,
+    step_timers: bool,
     frame_time: Instant,
     last_timer: Instant,
     last_cycle: Instant,
@@ -100,6 +102,8 @@ impl Emulator {
             input: bitarr![Msb0, u16; 0; 16],
             loaded: LoadedType::Nothing,
             pause: false,
+            step: false,
+            step_timers: false,
             frame_time: now,
             last_timer: now,
             last_cycle: now,
@@ -118,7 +122,7 @@ impl Emulator {
             LoadedType::Rom(rom) => {
                 self.cpu = CPU::new();
                 match self.cpu.load_rom(&rom) {
-                    Ok(_) => { self.gui.set_flag_pause(false); },
+                    Ok(_) => if !self.gui.flag_debug() { self.gui.set_flag_pause(false); },
                     Err(_) => self.gui.display_error("Data is not a valid ROM!"),
                 }
             },
@@ -245,6 +249,10 @@ impl Emulator {
                                 if let Err(e) = self.cpu.tick(&self.input) {
                                     self.gui.display_error(&format!("Error: {}", e));
                                 }
+                                if self.check_breakpoints() {
+                                    self.gui.set_flag_pause(true);
+                                    break;
+                                }
                             }
                         }
                         // Update CPU timers
@@ -255,6 +263,12 @@ impl Emulator {
                             self.last_timer = Instant::now();
                             self.cpu.update_timers();
                         }
+                    } else if self.step {
+                        if let Err(e) = self.cpu.tick(&self.input) {
+                            self.gui.display_error(&format!("Error: {}", e));
+                        }
+                    } else if self.step_timers {
+                        self.cpu.update_timers();
                     }
 
                     // Always request redrawing to keep the GUI updated
@@ -269,7 +283,7 @@ impl Emulator {
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
                     let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to prepare frame");
                     if !is_fullscreen {
-                        self.gui.render(frame_duration, self.display.display(), &mut frame, fps).expect("Failed to render GUI");
+                        self.gui.render(frame_duration, self.display.display(), &mut frame, fps, &self.cpu).expect("Failed to render GUI");
                     }
                     self.display.render(frame).expect("Failed to render frame");
                 },
@@ -342,10 +356,41 @@ impl Emulator {
         self.cpu.set_quirk_vf_order(self.gui.flag_quirk_vf_order());
         self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
         self.mute = self.gui.flag_mute();
+        
+        self.step = self.gui.flag_step();
+        self.gui.set_flag_step(false);
+        self.step_timers = self.gui.flag_step_timers();
+        self.gui.set_flag_step_timers(false);
 
         if pause != self.pause {
             self.set_pause(pause);
         }
+    }
+
+    #[inline]
+    fn check_breakpoints(&mut self) -> bool {
+        // Check breakpoints
+        use std::u16;
+        if self.gui.flag_breakpoint_pc() {
+            if let Ok(bp) = u16::from_str_radix(self.gui.breakpoint_pc(), 16) {
+                if self.cpu.check_breakpoint(Breakpoint::PC(bp)) {
+                    return true;
+                }
+            }
+        }
+        if self.gui.flag_breakpoint_i() {
+            if let Ok(bp) = u16::from_str_radix(self.gui.breakpoint_i(), 16) {
+                if self.cpu.check_breakpoint(Breakpoint::I(bp)) {
+                    return true;
+                }
+            }
+        }
+        if self.gui.flag_breakpoint_opcode() {
+            if self.cpu.check_breakpoint(Breakpoint::Opcode(self.gui.breakpoint_opcode().to_string())) {
+                return true;
+            }
+        }
+        false
     }
 
     #[inline]
@@ -374,6 +419,9 @@ impl Emulator {
             let shift = self.modifiers_state.shift();
             match (scancode, keycode, state, ctrl, shift) {
                 // Command keys
+                #[cfg(feature = "rom-download")]
+                (_, O, Pressed, true, true) => { self.gui.set_flag_open_rom_url(true); },
+
                 (_, Escape, Pressed, _, _) => {
                     if self.gui.flag_fullscreen() {
                         self.gui.set_flag_fullscreen(false);
@@ -381,14 +429,14 @@ impl Emulator {
                         *ctrl_flow = ControlFlow::Exit;
                     }
                 },
-                (_, F11, Pressed, _, _) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
+                (_, F1, Pressed, _, _) => { self.gui.set_flag_display_fps(!self.gui.flag_display_fps()); },
                 (_, F5, Pressed, _, _) => { self.gui.set_flag_reset(true); },
+                (_, F7, Pressed, _, _) => { self.gui.set_flag_debug(!self.gui.flag_debug()); },
+                (_, F8, Pressed, _, _) => { self.gui.set_flag_step(true); },
+                (_, F9, Pressed, _, _) => { self.gui.set_flag_step_timers(true); },
+                (_, F11, Pressed, _, _) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
                 (_, P, Pressed, _, _) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
                 (_, M, Pressed, _, _) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
-
-                #[cfg(feature = "rom-download")]
-                (_, O, Pressed, true, true) => { self.gui.set_flag_open_rom_url(true); },
-                
                 (_, O, Pressed, true, _) => { self.gui.set_flag_open(true); },
                 (_, S, Pressed, true, _) => { self.gui.set_flag_save_state(true); },
 

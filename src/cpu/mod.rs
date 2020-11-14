@@ -36,6 +36,12 @@ impl From<rmp_serde::decode::Error> for Error {
     }
 }
 
+pub enum Breakpoint {
+    PC(u16),
+    I(u16),
+    Opcode(String),
+}
+
 #[allow(non_snake_case)]
 #[derive(CopyGetters, Getters, Setters, Serialize, Deserialize)]
 pub struct CPU {
@@ -43,17 +49,32 @@ pub struct CPU {
     mem: [u8; 4096],                        // Main memory
     #[getset(get = "pub")]
     vmem: VideoMemory,                      // Graphics memory
+    #[getset(get_copy = "pub")]
     stack: [u16; 16],                       // Stack to store locations before a jump occurs
     keys: BitArray<Msb0, [u16; 1]>,         // Keypad status
 
+    #[getset(get_copy = "pub")]
     PC: u16,                                // Program counter
+    #[getset(get_copy = "pub")]
     V: [u8; 16],                            // Registers
+    #[getset(get_copy = "pub")]
     I: u16,                                 // Index register
+    #[getset(get_copy = "pub")]
     DT: u8,                                 // Delay timer
+    #[getset(get_copy = "pub")]
     ST: u8,                                 // Sound timer
+    #[getset(get_copy = "pub")]
     RPL: [u8; 8],                           // HP48 RPL flags (used for S-CHIP)
 
+    #[getset(get_copy = "pub")]
     opcode: u16,                            // Current opcode
+    #[getset(get = "pub")]
+    opcode_description: String,             // Current opcode description
+    #[getset(get_copy = "pub")]
+    next_opcode: u16,                       // Next opcode
+    #[getset(get = "pub")]
+    next_opcode_description: String,        // Next opcode description
+    #[getset(get_copy = "pub")]
     sp: usize,                              // Current stack position
 
     #[getset(get_copy = "pub", set = "pub")]
@@ -127,6 +148,9 @@ impl CPU {
             RPL: [0; 8],
 
             opcode: 0,
+            opcode_description: String::new(),
+            next_opcode: 0,
+            next_opcode_description: String::new(),
             sp: 0,
 
             draw: false,
@@ -164,7 +188,7 @@ impl CPU {
             self.vmem.set_video_mode(VideoMode::Default);
             &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
             self.PC = CPU::PC_INITIAL;
-            Ok(())
+            self.prefetch_next_opcode().map_err(|e| format!("{}", e))
         } else {
             self.load_bootrom();
             Err("Invalid ROM!".to_string())
@@ -202,13 +226,40 @@ impl CPU {
         }
     }
 
-    fn emulate_cycle(&mut self) -> Result<(), Error> {
-        // Fetch opcode
-        if self.PC as usize >= self.mem.len() - 1 {
+    pub fn check_breakpoint(&self, breakpoint: Breakpoint) -> bool {
+        match breakpoint {
+            Breakpoint::PC(val) => self.PC == val,
+            Breakpoint::I(val) => self.I == val,
+            Breakpoint::Opcode(pattern) => {
+                if pattern.len() != 4 {
+                    false
+                } else {
+                    let val = format!("{:04X}", self.next_opcode);
+                    for (pat_c, val_c) in pattern.chars().zip(val.chars()) {
+                        if pat_c != '*' && pat_c != val_c {
+                            return false;
+                        }
+                    }
+                    true
+                }
+            },
+        }
+    }
+
+    fn prefetch_next_opcode(&mut self) -> Result<(), Error> {
+        if self.PC as usize >= self.mem.len() - 2 {
             self.load_bootrom();
             return Err(Error::ProgramCounterOverflow);
         }
-        self.opcode = (self.mem[self.PC as usize] as u16) << 8 | (self.mem[(self.PC + 1) as usize] as u16);
+        self.next_opcode = (self.mem[self.PC as usize] as u16) << 8 | (self.mem[(self.PC + 1) as usize] as u16);
+        self.next_opcode_description = self.get_opcode_description(self.next_opcode);
+        Ok(())
+    }
+
+    fn emulate_cycle(&mut self) -> Result<(), Error> {
+        // Fetch opcode
+        self.opcode = self.next_opcode;
+        self.opcode_description = self.next_opcode_description.clone();
 
         // Decode opcode
         let x = (self.opcode & 0x0F00) as usize >> 8;
@@ -216,7 +267,6 @@ impl CPU {
         let n = (self.opcode & 0x000F) as u8;
         let nn = (self.opcode & 0x00FF) as u8;
         let nnn = (self.opcode & 0x0FFF) as u16;
-        let last_nibble = self.opcode & 0x000F;
 
         // Execute opcode
         match self.opcode & 0xF000 {
@@ -239,13 +289,13 @@ impl CPU {
             0x2000 => self.opcode_0x2NNN(nnn),
             0x3000 => self.opcode_0x3XNN(x, nn),
             0x4000 => self.opcode_0x4XNN(x, nn),
-            0x5000 => match last_nibble {
+            0x5000 => match n {
                 0x0 => self.opcode_0x5XY0(x, y),
                 _ => self.opcode_invalid(),
             },
             0x6000 => self.opcode_0x6XNN(x, nn),
             0x7000 => self.opcode_0x7XNN(x, nn),
-            0x8000 => match self.opcode & 0x000F {
+            0x8000 => match n {
                 0x0 => self.opcode_0x8XY0(x, y),
                 0x1 => self.opcode_0x8XY1(x, y),
                 0x2 => self.opcode_0x8XY2(x, y),
@@ -257,14 +307,14 @@ impl CPU {
                 0xE => self.opcode_0x8XYE(x, y),
                 _ => self.opcode_invalid(),
             },
-            0x9000 => match last_nibble {
+            0x9000 => match n {
                 0x0 => self.opcode_0x9XY0(x, y),
                 _ => self.opcode_invalid(),
             }
             0xA000 => self.opcode_0xANNN(nnn),
             0xB000 => self.opcode_0xBNNN(nnn),
             0xC000 => self.opcode_0xCXNN(x, nn),
-            0xD000 => self.opcode_0xDXYN(x, y, last_nibble as usize),
+            0xD000 => self.opcode_0xDXYN(x, y, n as usize),
             0xE000 => match nn {
                 0x9E => self.opcode_0xEX9E(x),
                 0xA1 => self.opcode_0xEXA1(x),
@@ -287,7 +337,9 @@ impl CPU {
             },
             _ => self.opcode_invalid(),
         };
-        Ok(())
+
+        // Fetch next opcode
+        self.prefetch_next_opcode()
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {
@@ -331,6 +383,86 @@ impl CPU {
         }
 
         self.V[0xF] = collision as u8;
+    }
+
+    fn get_opcode_description(&self, opcode: u16) -> String {
+        let x = (opcode & 0x0F00) as usize >> 8;
+        let y = (opcode & 0x00F0) as usize >> 4;
+        let n = (opcode & 0x000F) as u8;
+        let nn = (opcode & 0x00FF) as u8;
+        let nnn = (opcode & 0x0FFF) as u16;
+    
+        match opcode & 0xF000 {
+            0x0000 => match nnn {
+                0x0C1..=0x0CF => format!("SCD {}", n),
+                0x0E0 => String::from("CLS"),
+                0x0EE => String::from("RET"),
+                0x0FB => String::from("SCR [S-CHIP]"),
+                0x0FC => String::from("SCL [S-CHIP]"),
+                0x0FD => String::from("EXIT [S-CHIP]"),
+                0x0FE => String::from("LOW [S-CHIP]"),
+                0x0FF => String::from("HIGH [S-CHIP]"),
+                0x230 => if self.vmem.video_mode() == &VideoMode::HiRes { String::from("CLS [HiRes]") } else { format!("SYS {:03X} (Ignored)", nnn) },
+                _ => format!("SYS {:03X} (Ignored)", nnn),
+            },
+            0x1000 => match nnn {
+                0x260 => if self.PC == 0x200 { String::from("HIRES [HiRes]") } else { format!("JP {:03X}", nnn) },
+                _ => format!("JP {:03X}", nnn),
+            },
+            0x2000 => format!("CALL {:03X}", nnn),
+            0x3000 => format!("SE V{:X} ({:02X}), {:02X}", x, self.V[x], nn),
+            0x4000 => format!("SNE V{:X} ({:02X}), {:02X}", x, self.V[x], nn),
+            0x5000 => match n {
+                0x0 => format!("SE V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                _ => String::from("Invalid"),
+            },
+            0x6000 => format!("LD V{:X}, {:02X}", x, nn),
+            0x7000 => format!("ADD V{:X} ({:02X}), {:02X}", x, self.V[x], nn),
+            0x8000 => match n {
+                0x0 => format!("LD V{:X}, V{:X} ({:02X})", x, y, self.V[y]),
+                0x1 => format!("OR V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                0x2 => format!("AND V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                0x3 => format!("XOR V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                0x4 => format!("ADD V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                0x5 => format!("SUB V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                0x6 => if self.quirk_shift { format!("SHR V{:X} ({:02X})", x, self.V[x]) }
+                        else { format!("SHR V{:X}, V{:X} ({:02X})", x, y, self.V[y]) },
+                0x7 => format!("SUBN V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                0xE => if self.quirk_shift { format!("SHL V{:X} ({:02X})", x, self.V[x]) }
+                else { format!("SHL V{:X}, V{:X} ({:02X})", x, y, self.V[y]) },
+                _ => String::from("Invalid"),
+            },
+            0x9000 => match n {
+                0x0 => format!("SNE V{:X} ({:02X}), V{:X} ({:02X})", x, self.V[x], y, self.V[y]),
+                _ => String::from("Invalid"),
+            }
+            0xA000 => format!("LD I, {:03X}", nnn),
+            0xB000 => if self.quirk_jump { format!("JP V{:X} ({:03X}), {:03X}", x, self.V[x], nnn) }
+                        else { format!("JP V0 ({:02X}), {:03X}", self.V[0], nnn) },
+            0xC000 => format!("RND V{:X}, {:02X}", x, nn),
+            0xD000 => format!("DRW V{:X} ({:02X}), V{:X} ({:02X}), {:X}", x, self.V[x], y, self.V[y], n),
+            0xE000 => match nn {
+                0x9E => format!("SKP V{:X} ({:02X})", x, self.V[x]),
+                0xA1 => format!("SKNP V{:X} ({:02X})", x, self.V[x]),
+                _ => String::from("Invalid"),
+            },
+            0xF000 => match nn {
+                    0x07 => format!("LD V{:X}, DT ({:02X})", x, self.DT),
+                    0x0A => format!("LD V{:X}, K", x),
+                    0x15 => format!("LD DT, V{:X} ({:02X})", x, self.V[x]),
+                    0x18 => format!("LD ST, V{:X} ({:02X})", x, self.V[x]),
+                    0x1E => format!("ADD I, V{:X} ({:02X})", x, self.V[x]),
+                    0x29 => format!("LD F, V{:X} ({:02X})", x, self.V[x]),
+                    0x30 => format!("LD F, V{:X} ({:02X}) [S-CHIP]", x, self.V[x]),
+                    0x33 => format!("LD B, V{:X} ({:02X})", x, self.V[x]),
+                    0x55 => format!("LD [I], V{:X}", x),
+                    0x65 => format!("LD V{:X}, [I]", x),
+                    0x75 => format!("LD R, V{:X} [S-CHIP]", x),
+                    0x85 => format!("LD V{:X}, R [S-CHIP]", x),
+                    _ => String::from("Invalid"),
+            },
+            _ => String::from("Invalid"),
+        }
     }
 }
 

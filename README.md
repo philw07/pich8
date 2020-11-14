@@ -1,5 +1,5 @@
 # pich8
-A cross-platform CHIP-8 and SUPER-CHIP interpreter written in Rust
+A cross-platform CHIP-8 and SUPER-CHIP interpreter and debugger written in Rust
 
 I've recently decided to look into emulators and found many recommendations to start with a CHIP-8 interpreter.  
 Since I had just started to read [the book](https://doc.rust-lang.org/book/), I've decided to use this opportunity as my first Rust project.  
@@ -19,6 +19,7 @@ I can definitely recommend giving it a try, I learned a lot during this journey.
 - Fullscreen mode and possibility to change background and foreground colors
 - Change CPU speed dynamically
 - Disable several quirks (enabled by default) and vertical wrapping (some ROMs require specific quirks or vertical wrapping disabled)
+- Debug windows displaying current register values, stack and executed opcodes as well as allowing to set breakpoints
 
 ## Building
 

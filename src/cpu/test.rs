@@ -61,6 +61,7 @@ fn test_opcodes() {
     cpu.PC = 0x204;
     cpu.stack[0] = 0x200;
     cpu.sp = 1;
+    cpu.prefetch_next_opcode().unwrap();
     let _ = cpu.emulate_cycle();
     assert_eq!(cpu.PC, 0x202);
     assert_eq!(cpu.sp, 0);
@@ -149,8 +150,16 @@ fn test_opcodes() {
     assert_eq!(cpu.I, 0x123);
     assert_eq!(cpu.PC, 0x202);
 
-    // 0xBNNN
+    // 0xBNNN - Quirk
     cpu = CPU::new();
+    cpu.quirk_jump = true;
+    let _ = cpu.load_rom(&[0xB1, 0x23]);
+    cpu.V[1] = 0x11;
+    let _ = cpu.emulate_cycle();
+    assert_eq!(cpu.PC, 0x134);
+    // 0xBNNN - No quirk
+    cpu = CPU::new();
+    cpu.quirk_jump = false;
     let _ = cpu.load_rom(&[0xB1, 0x23]);
     cpu.V[0] = 0x11;
     let _ = cpu.emulate_cycle();
@@ -318,6 +327,7 @@ fn test_opcodes() {
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.I, i as u16 * 5);
         cpu.PC -= 2;
+        cpu.prefetch_next_opcode().unwrap();
     }
 
     // 0xFX33
@@ -405,7 +415,7 @@ fn test_opcodes_schip() {
     cpu.V[1] = 2;
     cpu.I = 0x300;
     cpu.mem[0x300..0x320].copy_from_slice(&[0xFF; 32]);
-    cpu.emulate_cycle();
+    let _ = cpu.emulate_cycle();
     for x in 65..81 {
         for y in 2..18 {
             assert_eq!(cpu.vmem.get(x, y), true);
@@ -423,6 +433,7 @@ fn test_opcodes_schip() {
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.I, 0x50 + i as u16 * 10);
         cpu.PC -= 2;
+        cpu.prefetch_next_opcode().unwrap();
     }
 
     // 0xFX75
