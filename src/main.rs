@@ -5,7 +5,6 @@ mod display;
 mod gui;
 mod sound;
 mod emulator;
-mod serde_big_array;
 mod dialog_handler;
 mod fps_counter;
 mod video_memory;

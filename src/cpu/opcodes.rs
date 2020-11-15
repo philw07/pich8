@@ -15,6 +15,13 @@ impl CPU {
         self.PC += 2;
     }
 
+    // 0x00DN - XO-CHIP - Scroll display N lines up
+    #[inline]
+    pub(super) fn opcode_xochip_0x00DN(&mut self, n: u8) {
+        self.vmem.scroll_up(n as usize);
+        self.PC += 2;
+    }
+
     // 0x00E0 - Clear display
     #[inline]
     pub(super) fn opcode_0x00E0(&mut self) {
@@ -112,19 +119,40 @@ impl CPU {
     // 0x3XNN - Skip next instruction if Vx == nn
     #[inline]
     pub(super) fn opcode_0x3XNN(&mut self, x: usize, nn: u8) {
-        self.PC += if self.V[x] == nn { 4 } else { 2 };
+        if self.V[x] == nn { self.skip_next_instruction(); }
+        self.PC += 2;
     }
 
     // 0x4XNN - Skip next instruction if Vx != nn
     #[inline]
     pub(super) fn opcode_0x4XNN(&mut self, x: usize, nn: u8) {
-        self.PC += if self.V[x] != nn { 4 } else { 2 };
+        if self.V[x] != nn { self.skip_next_instruction(); }
+        self.PC += 2;
     }
 
     // 0x5XY0 - Skip next instruction if Vx == Vy
     #[inline]
     pub(super) fn opcode_0x5XY0(&mut self, x: usize, y: usize) {
-        self.PC += if self.V[x] == self.V[y] { 4 } else { 2 };
+        if self.V[x] == self.V[y] { self.skip_next_instruction(); }
+        self.PC += 2;
+    }
+
+    // 0x5XY2 - XO-CHIP - Store Vx - Vy
+    #[inline]
+    pub(super) fn opcode_xochip_0x5XY2(&mut self, x: usize, y: usize) {
+        let first = std::cmp::min(x, y);
+        let last = std::cmp::max(x, y);
+        self.mem[self.I as usize..self.I as usize + last - first + 1].copy_from_slice(&self.V[first..=last]);
+        self.PC += 2;
+    }
+
+    // 0x5XY3 - XO-CHIP - Load Vx - Vy
+    #[inline]
+    pub(super) fn opcode_xochip_0x5XY3(&mut self, x: usize, y: usize) {
+        let first = std::cmp::min(x, y);
+        let last = std::cmp::max(x, y);
+        self.V[first..=last].copy_from_slice(&self.mem[self.I as usize..self.I as usize + last - first + 1]);
+        self.PC += 2;
     }
 
     // 0x6XNN - Vx = nn
@@ -226,7 +254,8 @@ impl CPU {
     // 0x9XY0 - Skip next instruction if Vx != Vy
     #[inline]
     pub(super) fn opcode_0x9XY0(&mut self, x: usize, y: usize) {
-        self.PC += if self.V[x] != self.V[y] { 4 } else { 2 };
+        if self.V[x] != self.V[y] { self.skip_next_instruction(); }
+        self.PC += 2;
     }
 
     // 0xANNN - I = nnn
@@ -263,13 +292,44 @@ impl CPU {
     // 0xEX9E - Skip next instruction if key(Vx) is pressed
     #[inline]
     pub(super) fn opcode_0xEX9E(&mut self, x: usize) {
-        self.PC += if self.keys[self.V[x] as usize] { 4 } else { 2 };
+        if self.keys[self.V[x] as usize] { self.skip_next_instruction(); }
+        self.PC += 2;
     }
 
     // 0xEXA1 - Skip next instruction if key(Vx) is not pressed
     #[inline]
     pub(super) fn opcode_0xEXA1(&mut self, x: usize) {
-        self.PC += if !self.keys[self.V[x] as usize] { 4 } else { 2 };
+        if !self.keys[self.V[x] as usize] { self.skip_next_instruction(); }
+        self.PC += 2;
+    }
+
+    // 0xF000 NNNN - XO-CHIP - I = NNNN
+    #[inline]
+    pub(super) fn opcode_xochip_0xF000(&mut self) {
+        self.I =  self.next_opcode_ext;
+        self.PC += 4;
+    }
+
+    // 0xFN01 - XO-CHIP - Plane N
+    #[inline]
+    pub(super) fn opcode_xochip_0xFN01(&mut self, n: usize) {
+        self.vmem.select_plane(match n {
+            0 => Plane::None,
+            1 => Plane::First,
+            2 => Plane::Second,
+            _ => Plane::Both,
+        });
+        self.PC += 2;
+    }
+
+    // 0xF002 - XO-CHIP - Audio
+    #[inline]
+    pub(super) fn opcode_xochip_0xF002(&mut self) {
+        use std::convert::TryInto;
+        if let Ok(buf) = self.mem[self.I as usize..self.I as usize + 16].try_into() {
+            self.audio_buffer = Some(buf);
+        }
+        self.PC += 2;
     }
 
     // 0xFX07 - Vx = DT
@@ -389,6 +449,15 @@ impl CPU {
         } else {
             self.V[0xF] = vf;
             self.V[reg] = value;
+        }
+    }
+
+    fn skip_next_instruction(&mut self) {
+        self.PC += 2;
+
+        // Check if next instruction is a 4 byte instruction (XO-CHIP)
+        if self.mem[self.PC as usize..=self.PC as usize + 1] == [0xF0, 0] {
+            self.PC += 2;
         }
     }
 }

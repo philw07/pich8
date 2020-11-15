@@ -1,20 +1,29 @@
-use std::ops::Index;
 use bitvec::{bitarr, array::BitArray, order::Msb0};
 use getset::{Getters, Setters};
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VideoMode {
     Default,
     HiRes,
     Extended,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Plane {
+    None,
+    First,
+    Second,
+    Both,
+}
+
 #[derive(Getters, Setters, Serialize, Deserialize)]
 pub struct VideoMemory {
-    vmem: [BitArray<Msb0, [u64; 32]>; 4],
+    vmem1: [BitArray<Msb0, [u64; 32]>; 4],
+    vmem2: [BitArray<Msb0, [u64; 32]>; 4],
     #[getset(get = "pub", set = "pub")]
     video_mode: VideoMode,
+    plane: Plane,
 }
 
 impl VideoMemory {
@@ -28,35 +37,58 @@ impl VideoMemory {
 
     pub fn new() -> Self {
         Self {
-            vmem: [
+            vmem1: [
+                bitarr![Msb0, u64; 0; 64*32],
+                bitarr![Msb0, u64; 0; 64*32],
+                bitarr![Msb0, u64; 0; 64*32],
+                bitarr![Msb0, u64; 0; 64*32]
+            ],
+            vmem2: [
                 bitarr![Msb0, u64; 0; 64*32],
                 bitarr![Msb0, u64; 0; 64*32],
                 bitarr![Msb0, u64; 0; 64*32],
                 bitarr![Msb0, u64; 0; 64*32]
             ],
             video_mode: VideoMode::Default,
+            plane: Plane::First,
         }
     }
 
-    pub fn set(&mut self, x: usize, y: usize, value: bool) {
+    pub fn select_plane(&mut self, plane: Plane) {
+        self.plane = plane;
+    }
+
+    pub fn current_plane(&self) -> Plane {
+        self.plane
+    }
+
+    pub fn set_plane(&mut self, plane: Plane, x: usize, y: usize, value: bool) {
         // In default video mode, we're translating the 64x32 screen to 128x64,
         // only this way the scroll commands work correctly in S-CHIP low res mode.
         if self.video_mode == VideoMode::Default {
             let (x, y) = (x * 2, y * 2);
-            self.set_index(self.get_index(x, y), value);
-            self.set_index(self.get_index(x+1, y), value);
-            self.set_index(self.get_index(x, y+1), value);
-            self.set_index(self.get_index(x+1, y+1), value);
+            self.set_index_plane(plane, self.to_index(x, y), value);
+            self.set_index_plane(plane, self.to_index(x+1, y), value);
+            self.set_index_plane(plane, self.to_index(x, y+1), value);
+            self.set_index_plane(plane, self.to_index(x+1, y+1), value);
         } else {
-            self.set_index(self.get_index(x, y), value);
+            self.set_index_plane(plane, self.to_index(x, y), value);
         }
     }
 
-    fn set_index(&mut self, index: usize, value: bool) {
+    fn set_index_plane(&mut self, plane: Plane, index: usize, value: bool) {
         if index >= self.render_width() * self.render_height() {
             panic!("Index out of bounds");
         }
-        self.vmem[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value);
+        match plane {
+            Plane::None => (),
+            Plane::First => self.vmem1[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value),
+            Plane::Second => self.vmem2[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value),
+            Plane::Both => {
+                self.vmem1[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value);
+                self.vmem2[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value);
+            },
+        }
     }
 
     pub fn clear(&mut self) {
@@ -64,8 +96,11 @@ impl VideoMemory {
     }
 
     pub fn set_all(&mut self, value: bool) {
-        for i in 0..self.vmem.len() {
-            self.vmem[i].set_all(value);
+        match self.plane {
+            Plane::None => (),
+            Plane::First => for i in 0..self.vmem1.len() { self.vmem1[i].set_all(value); },
+            Plane::Second => for i in 0..self.vmem2.len() { self.vmem2[i].set_all(value); },
+            Plane::Both => for i in 0..self.vmem1.len() { self.vmem1[i].set_all(value); self.vmem2[i].set_all(value); },
         }
     }
 
@@ -103,25 +138,57 @@ impl VideoMemory {
         }
     }
 
-    pub fn get_index(&self, x: usize, y: usize) -> usize {
+    pub fn to_index(&self, x: usize, y: usize) -> usize {
         y * self.render_width() + x
     }
 
-    pub fn get(&self, x: usize, y:usize) -> bool {
-        if self.video_mode == VideoMode::Default {
-            let (x, y) = (x * 2, y * 2);
-            self[self.get_index(x, y)]
-        } else {
-            self[self.get_index(x, y)]
+    pub fn get_index_plane(&self, plane: Plane, index: usize) -> bool {
+        if index >= self.render_width() * self.render_height() {
+            panic!("Index out of bounds");
         }
+        match plane {
+            Plane::None     => false,
+            Plane::First    => self.vmem1[index / Self::BUF_LEN][index % Self::BUF_LEN],
+            Plane::Second   => self.vmem2[index / Self::BUF_LEN][index % Self::BUF_LEN],
+            Plane::Both     => panic!("shouldn't call get with both planes selected!"),
+        }
+    }
+
+    pub fn get_plane(&self, plane: Plane, x: usize, y:usize) -> bool {
+        let (x, y) = if self.video_mode == VideoMode::Default { (x * 2, y * 2) } else { (x, y) };
+        self.get_index_plane(plane, self.to_index(x, y))
     }
 
     pub fn scroll_down(&mut self, lines: usize) {
         for y in (0..self.render_height()).rev() {
             for x in 0..self.render_width() {
-                let val = if y < lines { false } else { self.get(x, y - lines) };
-                // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
-                self.set_index(self.get_index(x, y), val);
+                if self.plane == Plane::First || self.plane == Plane::Both {
+                    let val = if y < lines { false } else { self.get_plane(Plane::First, x, y - lines) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::First, self.to_index(x, y), val);
+                }
+                if self.plane == Plane::Second || self.plane == Plane::Both {
+                    let val = if y < lines { false } else { self.get_plane(Plane::Second, x, y - lines) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::Second, self.to_index(x, y), val);
+                }
+            }
+        }
+    }
+
+    pub fn scroll_up(&mut self, lines: usize) {
+        for y in 0..self.render_height() {
+            for x in 0..self.render_width() {
+                if self.plane == Plane::First || self.plane == Plane::Both {
+                    let val = if y >= self.render_height() - lines { false } else { self.get_plane(Plane::First, x, y + lines) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::First, self.to_index(x, y), val);
+                }
+                if self.plane == Plane::Second || self.plane == Plane::Both {
+                    let val = if y >= self.render_height() - lines { false } else { self.get_plane(Plane::Second, x, y + lines) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::Second, self.to_index(x, y), val);
+                }
             }
         }
     }
@@ -129,9 +196,16 @@ impl VideoMemory {
     pub fn scroll_left(&mut self) {
         for x in 0..self.render_width() {
             for y in 0..self.render_height() {
-                let val = if x >= self.width() - 4 { false } else { self.get(x + 4, y) };
-                // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
-                self.set_index(self.get_index(x, y), val);
+                if self.plane == Plane::First || self.plane == Plane::Both {
+                    let val = if x >= self.width() - 4 { false } else { self.get_plane(Plane::First,x + 4, y) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::First, self.to_index(x, y), val);
+                }
+                if self.plane == Plane::Second || self.plane == Plane::Both {
+                    let val = if x >= self.width() - 4 { false } else { self.get_plane(Plane::Second,x + 4, y) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::Second, self.to_index(x, y), val);
+                }
             }
         }
     }
@@ -139,23 +213,18 @@ impl VideoMemory {
     pub fn scroll_right(&mut self) {
         for x in (0..self.render_width()).rev() {
             for y in 0..self.render_height() {
-                let val = if x < 4 { false } else { self.get(x - 4, y) };
-                // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
-                self.set_index(self.get_index(x, y), val);
+                if self.plane == Plane::First || self.plane == Plane::Both {
+                    let val = if x < 4 { false } else { self.get_plane(Plane::First,x - 4, y) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::First,self.to_index(x, y), val);
+                }
+                if self.plane == Plane::Second || self.plane == Plane::Both {
+                    let val = if x < 4 { false } else { self.get_plane(Plane::Second,x - 4, y) };
+                    // Need to use set_index instead of set, because set expects 64x32 coordinates in default video mode
+                    self.set_index_plane(Plane::Second,self.to_index(x, y), val);
+                }
             }
         }
-    }
-}
-
-impl Index<usize> for VideoMemory {
-    type Output = bool;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        if index >= self.render_width() * self.render_height() {
-            panic!("Index out of bounds");
-        }
-
-        &self.vmem[index / Self::BUF_LEN][index % Self::BUF_LEN]
     }
 }
 
@@ -168,7 +237,8 @@ mod video_memory_test {
         let vmem = VideoMemory::new();
         assert_eq!(vmem.video_mode, VideoMode::Default);
         for i in 0..64*32 {
-            assert_eq!(vmem[i], false);
+            assert_eq!(vmem.get_index_plane(Plane::First, i), false);
+            assert_eq!(vmem.get_index_plane(Plane::Second, i), false);
         }
     }
 
@@ -199,7 +269,7 @@ mod video_memory_test {
     fn test_get_index_out_of_bounds_hires() {
         let mut vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::HiRes);
-        let _ = vmem[64*64];
+        let _ = vmem.get_index_plane(vmem.plane, 64*64);
     }
 
     #[test]
@@ -207,52 +277,52 @@ mod video_memory_test {
     fn test_get_index_out_of_bounds_default_and_extended() {
         let mut vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::Extended);
-        let _ = vmem[128*64];
+        let _ = vmem.get_index_plane(vmem.plane, 128*64);
     }
 
     #[test]
     #[should_panic]
     fn test_set_index_out_of_bounds() {
         let mut vmem = VideoMemory::new();
-        vmem.set(0, 50, true);
+        vmem.set_plane(vmem.plane, 0, 50, true);
     }
 
     #[test]
     fn test_operations() {
         // Set - Default
         let mut vmem = VideoMemory::new();
-        vmem.set(32, 20, true);
-        assert_eq!(vmem.get(32, 20), true);
+        vmem.set_plane(vmem.plane, 32, 20, true);
+        assert_eq!(vmem.get_plane(vmem.plane, 32, 20), true);
         // Set - HiRes
         vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::HiRes);
-        vmem.set(32, 50, true);
-        assert_eq!(vmem.get(32, 50), true);
+        vmem.set_plane(vmem.plane, 32, 50, true);
+        assert_eq!(vmem.get_plane(vmem.plane, 32, 50), true);
         // Set - Extended
         vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::Extended);
-        vmem.set(100, 50, true);
-        assert_eq!(vmem.get(100, 50), true);
+        vmem.set_plane(vmem.plane, 100, 50, true);
+        assert_eq!(vmem.get_plane(vmem.plane, 100, 50), true);
 
         // Set all - Default
         vmem = VideoMemory::new();
         vmem.set_all(true);
         for i in 0..64*32 {
-            assert_eq!(vmem[i], true);
+            assert_eq!(vmem.get_index_plane(vmem.plane, i), true);
         }
         // Set all - HiRes
         vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::HiRes);
         vmem.set_all(true);
         for i in 0..64*64 {
-            assert_eq!(vmem[i], true);
+            assert_eq!(vmem.get_index_plane(vmem.plane, i), true);
         }
         // Set all - Extended
         vmem = VideoMemory::new();
         vmem.set_video_mode(VideoMode::Extended);
         vmem.set_all(true);
         for i in 0..128*64 {
-            assert_eq!(vmem[i], true);
+            assert_eq!(vmem.get_index_plane(vmem.plane, i), true);
         }
 
         // Clear - Default
@@ -260,7 +330,7 @@ mod video_memory_test {
         vmem.set_all(true);
         vmem.clear();
         for i in 0..64*32 {
-            assert_eq!(vmem[i], false);
+            assert_eq!(vmem.get_index_plane(vmem.plane, i), false);
         }
         // Clear - Default
         vmem = VideoMemory::new();
@@ -268,7 +338,7 @@ mod video_memory_test {
         vmem.set_all(true);
         vmem.clear();
         for i in 0..64*64 {
-            assert_eq!(vmem[i], false);
+            assert_eq!(vmem.get_index_plane(vmem.plane, i), false);
         }
         // Clear - Default
         vmem = VideoMemory::new();
@@ -276,7 +346,7 @@ mod video_memory_test {
         vmem.set_all(true);
         vmem.clear();
         for i in 0..128*64 {
-            assert_eq!(vmem[i], false);
+            assert_eq!(vmem.get_index_plane(vmem.plane, i), false);
         }
 
         // Scroll down
@@ -284,14 +354,29 @@ mod video_memory_test {
         vmem.set_video_mode(VideoMode::Extended);
         vmem.set_all(true);
         for x in 0..128 {
-            vmem.set(x, 35, false);
+            vmem.set_plane(vmem.plane, x, 35, false);
         }
         vmem.scroll_down(3);
         for x in 0..128 {
             for y in 0..4 {
-                assert_eq!(vmem.get(x, y), y==3);
+                assert_eq!(vmem.get_plane(vmem.plane, x, y), y==3);
             }
-            assert_eq!(vmem.get(x, 38), false);
+            assert_eq!(vmem.get_plane(vmem.plane, x, 38), false);
+        }
+
+        // Scroll up
+        vmem = VideoMemory::new();
+        vmem.set_video_mode(VideoMode::Extended);
+        vmem.set_all(true);
+        for x in 0..128 {
+            vmem.set_plane(vmem.plane, x, 35, false);
+        }
+        vmem.scroll_up(7);
+        for x in 0..128 {
+            for y in 56..64 {
+                assert_eq!(vmem.get_plane(vmem.plane, x, y), y==56);
+            }
+            assert_eq!(vmem.get_plane(vmem.plane, x, 28), false);
         }
 
         // Scroll left
@@ -299,14 +384,14 @@ mod video_memory_test {
         vmem.set_video_mode(VideoMode::Extended);
         vmem.set_all(true);
         for y in 0..64 {
-            vmem.set(108, y, false);
+            vmem.set_plane(vmem.plane, 108, y, false);
         }
         vmem.scroll_left();
         for y in 0..64 {
             for x in 123..128 {
-                assert_eq!(vmem.get(x, y), x==123);
+                assert_eq!(vmem.get_plane(vmem.plane, x, y), x==123);
             }
-            assert_eq!(vmem.get(104, y), false);
+            assert_eq!(vmem.get_plane(vmem.plane, 104, y), false);
         }
 
         // Scroll right
@@ -314,14 +399,118 @@ mod video_memory_test {
         vmem.set_video_mode(VideoMode::Extended);
         vmem.set_all(true);
         for y in 0..64 {
-            vmem.set(99, y, false);
+            vmem.set_plane(vmem.plane, 99, y, false);
         }
         vmem.scroll_right();
         for y in 0..64 {
             for x in 0..5 {
-                assert_eq!(vmem.get(x, y), x==4);
+                assert_eq!(vmem.get_plane(vmem.plane, x, y), x==4);
             }
-            assert_eq!(vmem.get(103, y), false);
+            assert_eq!(vmem.get_plane(vmem.plane, 103, y), false);
+        }
+    }
+
+    #[test]
+    fn test_planes() {
+        for plane in vec![Plane::None, Plane::First, Plane::Second, Plane::Both] {
+            let plane1 = plane == Plane::First || plane == Plane::Both;
+            let plane2 = plane == Plane::Second || plane == Plane::Both;
+
+            let mut vmem = VideoMemory::new();
+            vmem.select_plane(plane.clone());
+            assert_eq!(vmem.plane, plane);
+
+            // Set all
+            vmem.set_all(true);
+            for i in 0..128*64 {
+                assert_eq!(vmem.get_index_plane(Plane::First, i), plane1);
+                assert_eq!(vmem.get_index_plane(Plane::Second, i), plane2);
+            }
+
+            // Clear
+            vmem.clear();
+            for i in 0..128*64 {
+                assert_eq!(vmem.get_index_plane(Plane::First, i), false);
+                assert_eq!(vmem.get_index_plane(Plane::Second, i), false);
+            }
+
+            // Set x y + Get x y
+            vmem.clear();
+            vmem.set_plane(vmem.plane, 10, 10, true);
+            assert_eq!(vmem.get_plane(Plane::First, 10, 10), plane1);
+            assert_eq!(vmem.get_plane(Plane::Second, 10, 10), plane2);
+
+            // Scroll down
+            vmem = VideoMemory::new();
+            vmem.select_plane(plane);
+            vmem.set_video_mode(VideoMode::Extended);
+            vmem.set_all(true);
+            for x in 0..128 {
+                vmem.set_plane(vmem.plane, x, 35, false);
+            }
+            vmem.scroll_down(3);
+            for x in 0..128 {
+                for y in 0..4 {
+                    assert_eq!(vmem.get_plane(Plane::First, x, y), plane1 && y==3);
+                    assert_eq!(vmem.get_plane(Plane::Second, x, y), plane2 && y==3);
+                }
+                assert_eq!(vmem.get_plane(Plane::First, x, 38), false);
+                assert_eq!(vmem.get_plane(Plane::Second, x, 38), false);
+            }
+
+            // Scroll up
+            vmem = VideoMemory::new();
+            vmem.select_plane(plane);
+            vmem.set_video_mode(VideoMode::Extended);
+            vmem.set_all(true);
+            for x in 0..128 {
+                vmem.set_plane(vmem.plane, x, 35, false);
+            }
+            vmem.scroll_up(7);
+            for x in 0..128 {
+                for y in 56..64 {
+                    assert_eq!(vmem.get_plane(Plane::First, x, y), plane1 && y==56);
+                    assert_eq!(vmem.get_plane(Plane::Second, x, y), plane2 && y==56);
+                }
+                assert_eq!(vmem.get_plane(Plane::First, x, 28), false);
+                assert_eq!(vmem.get_plane(Plane::Second, x, 28), false);
+            }
+
+            // Scroll left
+            vmem = VideoMemory::new();
+            vmem.select_plane(plane);
+            vmem.set_video_mode(VideoMode::Extended);
+            vmem.set_all(true);
+            for y in 0..64 {
+                vmem.set_plane(vmem.plane, 108, y, false);
+            }
+            vmem.scroll_left();
+            for y in 0..64 {
+                for x in 123..128 {
+                    assert_eq!(vmem.get_plane(Plane::First, x, y), plane1 && x==123);
+                    assert_eq!(vmem.get_plane(Plane::Second, x, y), plane2 && x==123);
+                }
+                assert_eq!(vmem.get_plane(Plane::First, 104, y), false);
+                assert_eq!(vmem.get_plane(Plane::Second, 104, y), false);
+            }
+
+            // Scroll right
+            vmem = VideoMemory::new();
+            vmem.select_plane(plane);
+            vmem.set_video_mode(VideoMode::Extended);
+            vmem.set_all(true);
+            for y in 0..64 {
+                vmem.set_plane(vmem.plane, 99, y, false);
+            }
+            vmem.scroll_right();
+            for y in 0..64 {
+                for x in 0..5 {
+                    assert_eq!(vmem.get_plane(Plane::First, x, y), plane1 && x==4);
+                    assert_eq!(vmem.get_plane(Plane::Second, x, y), plane2 && x==4);
+                }
+                assert_eq!(vmem.get_plane(Plane::First, 103, y), false);
+                assert_eq!(vmem.get_plane(Plane::Second, 103, y), false);
+            }
         }
     }
 }

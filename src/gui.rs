@@ -39,9 +39,13 @@ pub struct GUI {
     #[getset(get_copy = "pub", set = "pub")]
     flag_fullscreen: bool,
     #[getset(get = "pub", set = "pub")]
-    bg_color: [f32; 3],
+    color_bg: [f32; 3],
     #[getset(get = "pub", set = "pub")]
-    fg_color: [f32; 3],
+    color_plane_1: [f32; 3],
+    #[getset(get = "pub", set = "pub")]
+    color_plane_2: [f32; 3],
+    #[getset(get = "pub", set = "pub")]
+    color_plane_both: [f32; 3],
     #[getset(get_copy = "pub", set = "pub")]
     flag_display_fps: bool,
     #[getset(get_copy = "pub", set = "pub")]
@@ -163,8 +167,10 @@ impl GUI {
             flag_exit: false,
 
             flag_fullscreen: false,
-            bg_color: [0.0; 3],
-            fg_color: [0.0; 3],
+            color_bg: [0.0; 3],
+            color_plane_1: [0.0; 3],
+            color_plane_2: [0.0; 3],
+            color_plane_both: [0.0; 3],
             flag_display_fps: false,
             flag_debug: false,
 
@@ -247,8 +253,10 @@ impl GUI {
                     .shortcut(im_str!("F11"))
                     .build_with_ref(&ui, &mut self.flag_fullscreen);
                 ui.separator();
-                ColorEdit::new(im_str!("Background Color"), &mut self.bg_color).build(&ui);
-                ColorEdit::new(im_str!("Foreground Color"), &mut self.fg_color).build(&ui);
+                ColorEdit::new(im_str!("Background Color"), &mut self.color_bg).build(&ui);
+                ColorEdit::new(im_str!("Foreground Color"), &mut self.color_plane_1).build(&ui);
+                ColorEdit::new(im_str!("Foreground Color 2 (XO-CHIP)"), &mut self.color_plane_2).build(&ui);
+                ColorEdit::new(im_str!("Foreground Color 3 (XO-CHIP)"), &mut self.color_plane_both).build(&ui);
                 ui.separator();
                 MenuItem::new(im_str!("Display FPS"))
                     .shortcut(im_str!("F1"))

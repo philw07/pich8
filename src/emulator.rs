@@ -1,7 +1,7 @@
 use crate::cpu::{CPU, Breakpoint};
 use crate::display::WindowDisplay;
 use crate::gui::GUI;
-use crate::sound::BeepSound;
+use crate::sound::AudioPlayer;
 use crate::dialog_handler::{DialogHandler, FileDialogResult, FileDialogType};
 use crate::fps_counter::FpsCounter;
 use std::{time::Instant, fs};
@@ -37,7 +37,7 @@ pub struct Emulator {
     cpu_speed: u32,
     display: WindowDisplay,
     gui: GUI,
-    sound: BeepSound,
+    sound: AudioPlayer,
     fps_counter: FpsCounter,
     mute: bool,
     input: BitArray<Msb0, [u16; 1]>,
@@ -60,7 +60,7 @@ impl Emulator {
     const CPU_FREQUENCY: u16 = 720;
     const TIMER_FREQUENCY: u8 = 60;
     const NANOS_PER_TIMER: u64 = 1_000_000_000 / Emulator::TIMER_FREQUENCY as u64;
-    const MAX_FILE_SIZE: u16 = 8192;
+    const MAX_FILE_SIZE: u32 = u16::MAX as u32 + 10000;
 
     pub fn new(event_loop: &EventLoop<()>, vsync: bool) -> Result<Self, String> {
         let display = WindowDisplay::new(&event_loop, vsync)?;
@@ -78,17 +78,29 @@ impl Emulator {
         gui.set_flag_vertical_wrapping(cpu.vertical_wrapping());
         gui.set_cpu_speed(cpu_speed);
 
-        let bg_color = display.bg_color();
-        gui.set_bg_color([
-            bg_color[0] as f32 / 255.0,
-            bg_color[1] as f32 / 255.0,
-            bg_color[2] as f32 / 255.0
+        let color_bg = display.color_bg();
+        gui.set_color_bg([
+            color_bg[0] as f32 / 255.0,
+            color_bg[1] as f32 / 255.0,
+            color_bg[2] as f32 / 255.0
         ]);
-        let fg_color = display.fg_color();
-        gui.set_fg_color([
-            fg_color[0] as f32 / 255.0,
-            fg_color[1] as f32 / 255.0,
-            fg_color[2] as f32 / 255.0
+        let color_p1 = display.color_plane_1();
+        gui.set_color_plane_1([
+            color_p1[0] as f32 / 255.0,
+            color_p1[1] as f32 / 255.0,
+            color_p1[2] as f32 / 255.0
+        ]);
+        let color_p2 = display.color_plane_2();
+        gui.set_color_plane_2([
+            color_p2[0] as f32 / 255.0,
+            color_p2[1] as f32 / 255.0,
+            color_p2[2] as f32 / 255.0
+        ]);
+        let color_pb = display.color_plane_both();
+        gui.set_color_plane_both([
+            color_pb[0] as f32 / 255.0,
+            color_pb[1] as f32 / 255.0,
+            color_pb[2] as f32 / 255.0
         ]);
 
         let now = Instant::now();
@@ -97,7 +109,7 @@ impl Emulator {
             cpu_speed,
             display,
             gui,
-            sound: BeepSound::new().expect("Failed to create sound output device"),
+            sound: AudioPlayer::new().expect("Failed to create sound output device"),
             mute: false,
             input: bitarr![Msb0, u16; 0; 16],
             loaded: LoadedType::Nothing,
@@ -248,6 +260,7 @@ impl Emulator {
                             for _ in 0..cycles {
                                 if let Err(e) = self.cpu.tick(&self.input) {
                                     self.gui.display_error(&format!("Error: {}", e));
+                                    continue;
                                 }
                                 if self.check_breakpoints() {
                                     self.gui.set_flag_pause(true);
@@ -257,10 +270,14 @@ impl Emulator {
                         }
                         // Update CPU timers
                         if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::NANOS_PER_TIMER {
-                            if self.cpu.sound_active() && !self.mute {
-                                self.sound.beep();
-                            }
                             self.last_timer = Instant::now();
+                            if self.cpu.ST() > 0 && !self.mute {
+                                if self.cpu.audio_buffer().is_some() {
+                                    self.sound.play_buffer(self.cpu.audio_buffer().unwrap());
+                                } else {
+                                    self.sound.beep();
+                                }
+                            }
                             self.cpu.update_timers();
                         }
                     } else if self.step {
@@ -335,17 +352,29 @@ impl Emulator {
             pause = true;
         }
 
-        let bg_color = self.gui.bg_color();
-        self.display.set_bg_color([
-            (bg_color[0] * 255.0) as u8,
-            (bg_color[1] * 255.0) as u8,
-            (bg_color[2] * 255.0) as u8
+        let color_bg = self.gui.color_bg();
+        self.display.set_color_bg([
+            (color_bg[0] * 255.0) as u8,
+            (color_bg[1] * 255.0) as u8,
+            (color_bg[2] * 255.0) as u8
         ]);
-        let fg_color = self.gui.fg_color();
-        self.display.set_fg_color([
-            (fg_color[0] * 255.0) as u8,
-            (fg_color[1] * 255.0) as u8,
-            (fg_color[2] * 255.0) as u8
+        let color_p1 = self.gui.color_plane_1();
+        self.display.set_color_plane_1([
+            (color_p1[0] * 255.0) as u8,
+            (color_p1[1] * 255.0) as u8,
+            (color_p1[2] * 255.0) as u8
+        ]);
+        let color_p2 = self.gui.color_plane_2();
+        self.display.set_color_plane_2([
+            (color_p2[0] * 255.0) as u8,
+            (color_p2[1] * 255.0) as u8,
+            (color_p2[2] * 255.0) as u8
+        ]);
+        let color_pb = self.gui.color_plane_both();
+        self.display.set_color_plane_both([
+            (color_pb[0] * 255.0) as u8,
+            (color_pb[1] * 255.0) as u8,
+            (color_pb[2] * 255.0) as u8
         ]);
 
         self.cpu_speed = self.gui.cpu_speed() as u32;

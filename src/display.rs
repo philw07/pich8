@@ -1,4 +1,4 @@
-use crate::video_memory::VideoMemory;
+use crate::video_memory::{VideoMemory, Plane};
 use getset::{Getters, Setters};
 use glium::{
     Display,
@@ -23,15 +23,21 @@ pub struct WindowDisplay {
     display: Display,
     frame_buffer: [u8; 2*WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
     #[getset(get = "pub", set = "pub")]
-    bg_color: [u8; 3],
+    color_bg: [u8; 3],
     #[getset(get = "pub", set = "pub")]
-    fg_color: [u8; 3],
+    color_plane_1: [u8; 3],
+    #[getset(get = "pub", set = "pub")]
+    color_plane_2: [u8; 3],
+    #[getset(get = "pub", set = "pub")]
+    color_plane_both: [u8; 3],
 }
 
 impl WindowDisplay {
     const WINDOW_TITLE: &'static str = "pich8";
-    const BG_COLOR: [u8; 3] = [0; 3];
-    const FG_COLOR: [u8; 3] = [255; 3];
+    const COLOR_BG: [u8; 3] = [0; 3];
+    const COLOR_PLANE_1: [u8; 3] = [255; 3];
+    const COLOR_PLANE_2: [u8; 3] = [85; 3];
+    const COLOR_PLANE_BOTH: [u8; 3] = [170; 3];
     const WINDOW_WIDTH: f32 = 800.0;
     const WINDOW_HEIGHT: f32 = WindowDisplay::WINDOW_WIDTH / (WindowDisplay::C8_WIDTH as f32 / WindowDisplay::C8_HEIGHT as f32);
     const C8_WIDTH: usize = 64;
@@ -63,15 +69,17 @@ impl WindowDisplay {
         
         // Clear screen with bg color
         let mut target = display.draw();
-        let bg_color = WindowDisplay::BG_COLOR;
-        target.clear_color(bg_color[0] as f32 / 255.0, bg_color[1] as f32 / 255.0, bg_color[2] as f32 / 255.0, 1.0);
+        let color_bg = WindowDisplay::COLOR_BG;
+        target.clear_color(color_bg[0] as f32 / 255.0, color_bg[1] as f32 / 255.0, color_bg[2] as f32 / 255.0, 1.0);
         target.finish().map_err(|e| format!("Failed to swap buffers: {}", e))?;
 
         Ok(Self{
             display,
-            frame_buffer: [0; 2*WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
-            bg_color,
-            fg_color: WindowDisplay::FG_COLOR,
+            frame_buffer: [0; 2*Self::C8_WIDTH * 2*Self::C8_HEIGHT * 3],
+            color_bg,
+            color_plane_1: Self::COLOR_PLANE_1,
+            color_plane_2: Self::COLOR_PLANE_2,
+            color_plane_both: Self::COLOR_PLANE_BOTH
         })
     }
 
@@ -83,17 +91,21 @@ impl WindowDisplay {
         // Copy over new frame
         for idx in 0..vmem.render_width()*vmem.render_height() {
             let buf_idx = idx * 3;
-            if vmem[idx] {
-                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.fg_color);
+            if vmem.get_index_plane(Plane::First, idx) && vmem.get_index_plane(Plane::Second, idx) {
+                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.color_plane_both);
+            } else if vmem.get_index_plane(Plane::First, idx) {
+                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.color_plane_1);
+            } else if vmem.get_index_plane(Plane::Second, idx) {
+                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.color_plane_2);
             } else {
-                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.bg_color);
+                self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.color_bg);
             }
         }
         let frame_len = vmem.render_width() * vmem.render_height() * 3;
 
         // Prepare texture
         let mut frame = self.display.draw();
-        frame.clear_color(self.bg_color[0] as f32 / 255.0, self.bg_color[1] as f32 / 255.0, self.bg_color[2] as f32 / 255.0, 1.0);
+        frame.clear_color(self.color_bg[0] as f32 / 255.0, self.color_bg[1] as f32 / 255.0, self.color_bg[2] as f32 / 255.0, 1.0);
         let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..frame_len], (vmem.render_width() as u32, vmem.render_height() as u32));
         let texture = Texture2d::new(&self.display, img)
             .map_err(|e| format!("Failed to create texture: {}", e))?;
