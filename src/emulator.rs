@@ -262,7 +262,7 @@ impl Emulator {
                                     self.gui.display_error(&format!("Error: {}", e));
                                     continue;
                                 }
-                                if self.check_breakpoints() {
+                                if self.gui.flag_debug() && self.check_breakpoints() {
                                     self.gui.set_flag_pause(true);
                                     break;
                                 }
