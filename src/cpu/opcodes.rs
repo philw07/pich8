@@ -110,10 +110,16 @@ impl CPU {
 
     // 0x2NNN - Call subroutine at nnn
     #[inline]
-    pub(super) fn opcode_0x2NNN(&mut self, nnn: u16) {
-        self.stack[self.sp] = self.PC;
-        self.sp += 1;
-        self.PC = nnn;
+    pub(super) fn opcode_0x2NNN(&mut self, nnn: u16) -> Result<(), Error> {
+        if self.sp >= self.stack.len() {
+            self.load_bootrom();
+            Err(Error::StackOverflow)
+        } else {
+            self.stack[self.sp] = self.PC;
+            self.sp += 1;
+            self.PC = nnn;
+            Ok(())
+        }
     }
 
     // 0x3XNN - Skip next instruction if Vx == nn

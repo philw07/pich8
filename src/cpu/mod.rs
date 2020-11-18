@@ -12,6 +12,7 @@ pub enum Error {
     SaveStateError(rmp_serde::encode::Error),
     LoadStateError(rmp_serde::decode::Error),
     ProgramCounterOverflow,
+    StackOverflow,
 }
 
 impl fmt::Display for Error {
@@ -19,7 +20,8 @@ impl fmt::Display for Error {
         match self {
             Error::SaveStateError(e) => write!(f, "Save state error: {}", e),
             Error::LoadStateError(e) => write!(f, "Load state error: {}", e),
-            Error::ProgramCounterOverflow => write!(f, "Program counter overflow"),
+            Error::ProgramCounterOverflow => write!(f, "Program counter overflow!"),
+            Error::StackOverflow => write!(f, "Stack overflow occurred! The ROM might be invalid or different quirk settings required."),
         }
     }
 }
@@ -287,7 +289,7 @@ impl CPU {
             (  1,   2,   6,   0) => self.opcode_0x1260(nnn),
             (  1, _  , _  , _  ) => self.opcode_0x1NNN(nnn),
 
-            (  2, _  , _  , _  ) => self.opcode_0x2NNN(nnn),
+            (  2, _  , _  , _  ) => self.opcode_0x2NNN(nnn)?,
 
             (  3, _  , _  , _  ) => self.opcode_0x3XNN(x, nn),
 
