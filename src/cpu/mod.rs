@@ -193,6 +193,7 @@ impl CPU {
             self.vmem.set_video_mode(VideoMode::Default);
             &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
             self.PC = CPU::PC_INITIAL;
+            self.sp = 0;
             self.prefetch_next_opcode().map_err(|e| format!("{}", e))
         } else {
             self.load_bootrom();
