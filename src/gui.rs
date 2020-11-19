@@ -354,7 +354,11 @@ impl GUI {
             }
             if self.flag_about {
                 self.is_open = true;
-                let about_win_size = [250.0, 110.0];
+                let app_name = im_str!("pich8");
+                let about_text = im_str!("A cross-platform CHIP-8, SUPER-CHIP and XO-CHIP interpreter and debugger written in Rust");
+                let app_name_size = ui.calc_text_size(app_name, false, 0.0);
+                let about_text_size = ui.calc_text_size(about_text, false, 250.0);
+                let about_win_size = [about_text_size[0] + 50.0, about_text_size[1] + app_name_size[1] + 60.0];
                 let about_win_pos = [
                     window_width / 2.0 - about_win_size[0] / 2.0,
                     window_height / 2.0 - about_win_size[1] / 2.0
@@ -369,12 +373,13 @@ impl GUI {
                     .movable(false)
                     .build(&ui, || {
                         let cfont_big = ui.push_font(custom_font_big);
-                        Self::centered_text(&ui, im_str!("pich8"), about_win_size[0]);
+                        ui.set_cursor_pos([about_win_size[0] / 2.0 - app_name_size[0] / 2.0, ui.cursor_pos()[1]]);
+                        Self::centered_text(&ui, app_name, about_win_size[0]);
                         cfont_big.pop(&ui);
 
                         ui.spacing();
-                        Self::centered_text(&ui, im_str!("A cross-platform CHIP-8"), about_win_size[0]);
-                        Self::centered_text(&ui, im_str!("interpreter written in Rust"), about_win_size[0]);
+                        ui.set_cursor_pos([about_win_size[0] / 2.0 - about_text_size[0] / 2.0, ui.cursor_pos()[1]]);
+                        ui.text_wrapped(about_text);
                     });
             }
             if self.flag_error {
