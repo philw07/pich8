@@ -311,6 +311,30 @@ impl GUI {
                         .build_with_ref(&ui, &mut self.flag_quirk_jump);
                     MenuItem::new(im_str!("VF Order"))
                         .build_with_ref(&ui, &mut self.flag_quirk_vf_order);
+                    ui.separator();
+
+                    let mut default_preset = self.flag_quirk_load_store && self.flag_quirk_shift && self.flag_quirk_draw && self.flag_quirk_jump && self.flag_quirk_vf_order;
+                    MenuItem::new(im_str!("Default Preset (legacy ROMs)"))
+                        .build_with_ref(&ui, &mut default_preset);
+                    if default_preset {
+                        self.flag_quirk_load_store = true;
+                        self.flag_quirk_shift = true;
+                        self.flag_quirk_draw = true;
+                        self.flag_quirk_jump = true;
+                        self.flag_quirk_vf_order = true;
+                    }
+
+                    let mut octo_preset = !self.flag_quirk_load_store && !self.flag_quirk_shift && self.flag_quirk_draw && !self.flag_quirk_jump && self.flag_quirk_vf_order;
+                    MenuItem::new(im_str!("Octo Preset"))
+                        .build_with_ref(&ui, &mut octo_preset);
+                    if octo_preset {
+                        self.flag_quirk_load_store = false;
+                        self.flag_quirk_shift = false;
+                        self.flag_quirk_draw = true;
+                        self.flag_quirk_jump = false;
+                        self.flag_quirk_vf_order = true;
+                    }
+                    
                     quirks_menu.end(&ui);
                 }
                 MenuItem::new(im_str!("Vertical Wrapping"))
@@ -323,7 +347,7 @@ impl GUI {
                     .display_format(im_str!("%d %%"))
                     .build(&ui, &mut vol);
                 self.volume = vol as f32 / 100.0;
-                
+
                 MenuItem::new(im_str!("Mute Audio"))
                     .shortcut(im_str!("M"))
                     .build_with_ref(&ui, &mut self.flag_mute);
