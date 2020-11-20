@@ -2,7 +2,7 @@ use crate::cpu::CPU;
 use std::time::Duration;
 use glium::{Display, Surface, glutin::event::Event};
 use getset::{CopyGetters, Getters, Setters};
-use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition, ImString, ImStr, StyleColor};
+use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition, ImString, ImStr, StyleColor, Slider};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 
@@ -71,6 +71,8 @@ pub struct GUI {
     flag_vertical_wrapping: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_mute: bool,
+    #[getset(get_copy = "pub", set = "pub")]
+    volume: f32,
 
     flag_about: bool,
     flag_error: bool,
@@ -186,6 +188,7 @@ impl GUI {
             flag_quirk_vf_order: false,
             flag_vertical_wrapping: false,
             flag_mute: false,
+            volume: 0.0,
 
             flag_about: false,
             flag_error: false,
@@ -313,6 +316,14 @@ impl GUI {
                 MenuItem::new(im_str!("Vertical Wrapping"))
                     .build_with_ref(&ui, &mut self.flag_vertical_wrapping);
                 ui.separator();
+
+                let mut vol = (self.volume * 100.0) as u8;
+                Slider::new(im_str!("Audio Volume"))
+                    .range(0..=100)
+                    .display_format(im_str!("%d %%"))
+                    .build(&ui, &mut vol);
+                self.volume = vol as f32 / 100.0;
+                
                 MenuItem::new(im_str!("Mute Audio"))
                     .shortcut(im_str!("M"))
                     .build_with_ref(&ui, &mut self.flag_mute);

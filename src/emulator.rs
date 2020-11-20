@@ -77,6 +77,7 @@ impl Emulator {
         gui.set_flag_quirk_vf_order(cpu.quirk_vf_order());
         gui.set_flag_vertical_wrapping(cpu.vertical_wrapping());
         gui.set_cpu_speed(cpu_speed);
+        gui.set_volume(0.25);
 
         let color_bg = display.color_bg();
         gui.set_color_bg([
@@ -385,6 +386,7 @@ impl Emulator {
         self.cpu.set_quirk_vf_order(self.gui.flag_quirk_vf_order());
         self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
         self.mute = self.gui.flag_mute();
+        self.sound.set_volume(self.gui.volume());
         
         self.step = self.gui.flag_step();
         self.gui.set_flag_step(false);

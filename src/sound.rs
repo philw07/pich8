@@ -12,6 +12,7 @@ use bitvec::{vec::BitVec, order::Msb0};
 pub enum Command {
     PlayBeep,
     PlayBuffer([u8; 16]),
+    SetVolume(f32),
 }
 
 pub struct AudioPlayer {
@@ -32,7 +33,6 @@ impl AudioPlayer {
             let beep_duration = Duration::from_secs_f32(1.5/60.0);
             if let Ok((_stream, stream_handle)) = OutputStream::try_default() {
                 if let Ok(sink) = Sink::try_new(&stream_handle) {
-                    sink.set_volume(AudioPlayer::VOLUME);
                     sink.append(output_queue);
         
                     loop {
@@ -49,6 +49,7 @@ impl AudioPlayer {
                                     let sample_buffer = SamplesBuffer::new(1, sample_rate, samples);
                                     queue.append(sample_buffer.take_duration(Duration::from_secs_f32(1.0 / 60.0)));
                                 },
+                                Command::SetVolume(vol) => sink.set_volume(vol),
                             }
                         }
                     }
@@ -68,5 +69,10 @@ impl AudioPlayer {
 
     pub fn play_buffer(&self, buf: [u8; 16]) {
         let _ = self.tx_play.send(Command::PlayBuffer(buf));
+    }
+
+    pub fn set_volume(&self, volume: f32) {
+        // The default volume range is extremely loud, I found 0 - 10 to be a good range 
+        let _ = self.tx_play.send(Command::SetVolume(volume / 10.0));
     }
 }
