@@ -51,6 +51,8 @@ pub struct Emulator {
     pause_time: Instant,
     dialog_handler: DialogHandler,
     modifiers_state: ModifiersState,
+    last_correction_timer: Instant,
+    counter_timer: u32,
 
     #[cfg(feature = "rom-download")]
     rom_downloader: RomDownloader,
@@ -124,6 +126,8 @@ impl Emulator {
             dialog_handler: DialogHandler::new(),
             fps_counter: FpsCounter::new(),
             modifiers_state: ModifiersState::empty(),
+            last_correction_timer: Instant::now(),
+            counter_timer: 0,
 
             #[cfg(feature = "rom-download")]
             rom_downloader: RomDownloader::new(),
@@ -272,14 +276,34 @@ impl Emulator {
                         // Update CPU timers
                         if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::NANOS_PER_TIMER {
                             self.last_timer = Instant::now();
-                            if self.cpu.ST() > 0 && !self.mute {
-                                if self.cpu.audio_buffer().is_some() {
-                                    self.sound.play_buffer(self.cpu.audio_buffer().unwrap());
-                                } else {
-                                    self.sound.beep();
+                            let mut reps = 1;
+                            let mut reset_counter = false;
+
+                            // Check and correct frequency regularly
+                            if self.last_correction_timer.elapsed().as_secs_f64() >= 0.25 {
+                                let target = Self::TIMER_FREQUENCY as u32 / 4;
+                                if self.counter_timer + 1 < target {
+                                    reps += target - self.counter_timer - 1;
                                 }
+                                self.last_correction_timer = Instant::now();
+                                reset_counter = true;
                             }
-                            self.cpu.update_timers();
+
+                            for _ in 0..reps {
+                                if self.cpu.ST() > 0 && !self.mute {
+                                    if self.cpu.audio_buffer().is_some() {
+                                        self.sound.play_buffer(self.cpu.audio_buffer().unwrap());
+                                    } else {
+                                        self.sound.beep();
+                                    }
+                                }
+                                self.cpu.update_timers();
+                                self.counter_timer += 1;
+                            }
+
+                            if reset_counter {
+                                self.counter_timer = 0;
+                            }
                         }
                     } else if self.step {
                         if let Err(e) = self.cpu.tick(&self.input) {
