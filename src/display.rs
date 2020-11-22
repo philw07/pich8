@@ -22,6 +22,8 @@ use glium::{
 pub struct WindowDisplay {
     display: Display,
     frame_buffer: [u8; 2*WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
+    width: u32,
+    height: u32,
     #[getset(get = "pub", set = "pub")]
     color_bg: [u8; 3],
     #[getset(get = "pub", set = "pub")]
@@ -76,6 +78,8 @@ impl WindowDisplay {
         Ok(Self{
             display,
             frame_buffer: [0; 2*Self::C8_WIDTH * 2*Self::C8_HEIGHT * 3],
+            width: 0,
+            height: 0,
             color_bg,
             color_plane_1: Self::COLOR_PLANE_1,
             color_plane_2: Self::COLOR_PLANE_2,
@@ -87,8 +91,7 @@ impl WindowDisplay {
         &self.display
     }
 
-    pub fn prepare(&mut self, vmem: &VideoMemory, menu_height: u32) -> Result<Frame, String> {
-        // Copy over new frame
+    fn copy_frame(&mut self, vmem: &VideoMemory) {
         for idx in 0..vmem.render_width()*vmem.render_height() {
             let buf_idx = idx * 3;
             if vmem.get_index_plane(Plane::First, idx) && vmem.get_index_plane(Plane::Second, idx) {
@@ -101,12 +104,21 @@ impl WindowDisplay {
                 self.frame_buffer[buf_idx..buf_idx+3].copy_from_slice(&self.color_bg);
             }
         }
-        let frame_len = vmem.render_width() * vmem.render_height() * 3;
+        self.width = vmem.render_width() as u32;
+        self.height = vmem.render_height() as u32;
+    }
+
+    pub fn prepare(&mut self, vmem: Option<&VideoMemory>, menu_height: u32) -> Result<Frame, String> {
+        // Copy over new frame
+        if let Some(vmem) = vmem {
+            self.copy_frame(vmem);
+        }
+        let frame_len = self.width as usize * self.height as usize * 3;
 
         // Prepare texture
         let mut frame = self.display.draw();
         frame.clear_color(self.color_bg[0] as f32 / 255.0, self.color_bg[1] as f32 / 255.0, self.color_bg[2] as f32 / 255.0, 1.0);
-        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..frame_len], (vmem.render_width() as u32, vmem.render_height() as u32));
+        let img = RawImage2d::from_raw_rgb_reversed(&self.frame_buffer[..frame_len], (self.width, self.height));
         let texture = Texture2d::new(&self.display, img)
             .map_err(|e| format!("Failed to create texture: {}", e))?;
 

@@ -68,6 +68,7 @@ impl Emulator {
         let display = WindowDisplay::new(&event_loop, vsync)?;
         let mut cpu = CPU::new();
         cpu.load_bootrom();
+        cpu.set_draw(true);
         let cpu_speed = Emulator::CPU_FREQUENCY as u32;
 
         // Initialize GUI
@@ -323,7 +324,8 @@ impl Emulator {
 
                     let is_fullscreen = self.display.fullscreen();
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
-                    let mut frame = self.display.prepare(self.cpu.vmem(), height).expect("Failed to prepare frame");
+                    let vmem = if self.cpu.draw() { self.cpu.set_draw(false); Some(self.cpu.vmem()) } else { None };
+                    let mut frame = self.display.prepare(vmem, height).expect("Failed to prepare frame");
                     if !is_fullscreen {
                         self.gui.render(frame_duration, self.display.display(), &mut frame, fps, &self.cpu).expect("Failed to render GUI");
                     }
