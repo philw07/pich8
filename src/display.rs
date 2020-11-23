@@ -3,7 +3,7 @@ use getset::{Getters, Setters};
 use glium::{
     Display,
     glutin::{
-        window::WindowBuilder,
+        window::{WindowBuilder, Icon},
         event_loop::EventLoop,
         dpi::LogicalSize,
         ContextBuilder,
@@ -46,9 +46,16 @@ impl WindowDisplay {
     const C8_HEIGHT: usize = 32;
 
     pub fn new(event_loop: &EventLoop<()>, vsync: bool) -> Result<Self, String> {
+        // Load icon
+        let icon_file = include_bytes!("../data/icon/pich8_32.png");
+        let icon_image = image::load_from_memory_with_format(icon_file, image::ImageFormat::Png).map_err(|e| format!("Failed to load icon: {}", e))?.into_rgba8();
+        let (width, height) = icon_image.dimensions();
+        let icon = Icon::from_rgba(icon_image.into_raw(), width, height).map_err(|e| format!("Failed to parse icon: {}", e))?;
+
         // Create window
         let context = ContextBuilder::new().with_vsync(vsync);
         let builder = WindowBuilder::new()
+            .with_window_icon(Some(icon))
             .with_title(WindowDisplay::WINDOW_TITLE)
             .with_min_inner_size(LogicalSize::new(8.0 * WindowDisplay::C8_WIDTH as f32, 8.0 * WindowDisplay::C8_HEIGHT as f32))
             .with_inner_size(LogicalSize::new(WindowDisplay::WINDOW_WIDTH, WindowDisplay::WINDOW_HEIGHT));
