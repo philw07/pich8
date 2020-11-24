@@ -36,10 +36,6 @@ pub struct WindowDisplay {
 
 impl WindowDisplay {
     const WINDOW_TITLE: &'static str = "pich8";
-    const COLOR_BG: [u8; 3] = [0; 3];
-    const COLOR_PLANE_1: [u8; 3] = [255; 3];
-    const COLOR_PLANE_2: [u8; 3] = [85; 3];
-    const COLOR_PLANE_BOTH: [u8; 3] = [170; 3];
     const WINDOW_WIDTH: f32 = 800.0;
     const WINDOW_HEIGHT: f32 = WindowDisplay::WINDOW_WIDTH / (WindowDisplay::C8_WIDTH as f32 / WindowDisplay::C8_HEIGHT as f32);
     const C8_WIDTH: usize = 64;
@@ -78,7 +74,7 @@ impl WindowDisplay {
         
         // Clear screen with bg color
         let mut target = display.draw();
-        let color_bg = WindowDisplay::COLOR_BG;
+        let color_bg = [0; 3];
         target.clear_color(color_bg[0] as f32 / 255.0, color_bg[1] as f32 / 255.0, color_bg[2] as f32 / 255.0, 1.0);
         target.finish().map_err(|e| format!("Failed to swap buffers: {}", e))?;
 
@@ -88,9 +84,9 @@ impl WindowDisplay {
             width: 0,
             height: 0,
             color_bg,
-            color_plane_1: Self::COLOR_PLANE_1,
-            color_plane_2: Self::COLOR_PLANE_2,
-            color_plane_both: Self::COLOR_PLANE_BOTH
+            color_plane_1: [0; 3],
+            color_plane_2: [0; 3],
+            color_plane_both: [0; 3],
         })
     }
 

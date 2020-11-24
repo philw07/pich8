@@ -8,6 +8,7 @@ mod emulator;
 mod dialog_handler;
 mod fps_counter;
 mod video_memory;
+mod preset_handler;
 
 #[cfg(feature = "rom-download")]
 mod rom_downloader;

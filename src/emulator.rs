@@ -53,6 +53,7 @@ pub struct Emulator {
     modifiers_state: ModifiersState,
     last_correction_timer: Instant,
     counter_timer: u32,
+    force_redraw: bool,
 
     #[cfg(feature = "rom-download")]
     rom_downloader: RomDownloader,
@@ -73,39 +74,8 @@ impl Emulator {
 
         // Initialize GUI
         let mut gui = GUI::new(display.display());
-        gui.set_flag_quirk_load_store(cpu.quirk_load_store());
-        gui.set_flag_quirk_shift(cpu.quirk_shift());
-        gui.set_flag_quirk_draw(cpu.quirk_draw());
-        gui.set_flag_quirk_jump(cpu.quirk_jump());
-        gui.set_flag_quirk_vf_order(cpu.quirk_vf_order());
-        gui.set_flag_vertical_wrapping(cpu.vertical_wrapping());
         gui.set_cpu_speed(cpu_speed);
         gui.set_volume(0.25);
-
-        let color_bg = display.color_bg();
-        gui.set_color_bg([
-            color_bg[0] as f32 / 255.0,
-            color_bg[1] as f32 / 255.0,
-            color_bg[2] as f32 / 255.0
-        ]);
-        let color_p1 = display.color_plane_1();
-        gui.set_color_plane_1([
-            color_p1[0] as f32 / 255.0,
-            color_p1[1] as f32 / 255.0,
-            color_p1[2] as f32 / 255.0
-        ]);
-        let color_p2 = display.color_plane_2();
-        gui.set_color_plane_2([
-            color_p2[0] as f32 / 255.0,
-            color_p2[1] as f32 / 255.0,
-            color_p2[2] as f32 / 255.0
-        ]);
-        let color_pb = display.color_plane_both();
-        gui.set_color_plane_both([
-            color_pb[0] as f32 / 255.0,
-            color_pb[1] as f32 / 255.0,
-            color_pb[2] as f32 / 255.0
-        ]);
 
         let now = Instant::now();
         Ok(Self{
@@ -129,6 +99,7 @@ impl Emulator {
             modifiers_state: ModifiersState::empty(),
             last_correction_timer: Instant::now(),
             counter_timer: 0,
+            force_redraw: true,
 
             #[cfg(feature = "rom-download")]
             rom_downloader: RomDownloader::new(),
@@ -324,7 +295,7 @@ impl Emulator {
 
                     let is_fullscreen = self.display.fullscreen();
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
-                    let vmem = if self.cpu.draw() { self.cpu.set_draw(false); Some(self.cpu.vmem()) } else { None };
+                    let vmem = if self.force_redraw || self.cpu.draw() { self.cpu.set_draw(false); Some(self.cpu.vmem()) } else { None };
                     let mut frame = self.display.prepare(vmem, height).expect("Failed to prepare frame");
                     if !is_fullscreen {
                         self.gui.render(frame_duration, self.display.display(), &mut frame, fps, &self.cpu).expect("Failed to render GUI");
@@ -379,30 +350,36 @@ impl Emulator {
             pause = true;
         }
 
-        let color_bg = self.gui.color_bg();
-        self.display.set_color_bg([
-            (color_bg[0] * 255.0) as u8,
-            (color_bg[1] * 255.0) as u8,
-            (color_bg[2] * 255.0) as u8
-        ]);
-        let color_p1 = self.gui.color_plane_1();
-        self.display.set_color_plane_1([
-            (color_p1[0] * 255.0) as u8,
-            (color_p1[1] * 255.0) as u8,
-            (color_p1[2] * 255.0) as u8
-        ]);
-        let color_p2 = self.gui.color_plane_2();
-        self.display.set_color_plane_2([
-            (color_p2[0] * 255.0) as u8,
-            (color_p2[1] * 255.0) as u8,
-            (color_p2[2] * 255.0) as u8
-        ]);
-        let color_pb = self.gui.color_plane_both();
-        self.display.set_color_plane_both([
-            (color_pb[0] * 255.0) as u8,
-            (color_pb[1] * 255.0) as u8,
-            (color_pb[2] * 255.0) as u8
-        ]);
+        self.force_redraw = false;
+        if self.gui.flag_color_changed() {
+            self.gui.set_flag_color_changed(false);
+            self.force_redraw = true;
+
+            let color_bg = self.gui.color_bg();
+            self.display.set_color_bg([
+                (color_bg[0] * 255.0) as u8,
+                (color_bg[1] * 255.0) as u8,
+                (color_bg[2] * 255.0) as u8
+            ]);
+            let color_p1 = self.gui.color_plane_1();
+            self.display.set_color_plane_1([
+                (color_p1[0] * 255.0) as u8,
+                (color_p1[1] * 255.0) as u8,
+                (color_p1[2] * 255.0) as u8
+            ]);
+            let color_p2 = self.gui.color_plane_2();
+            self.display.set_color_plane_2([
+                (color_p2[0] * 255.0) as u8,
+                (color_p2[1] * 255.0) as u8,
+                (color_p2[2] * 255.0) as u8
+            ]);
+            let color_pb = self.gui.color_plane_both();
+            self.display.set_color_plane_both([
+                (color_pb[0] * 255.0) as u8,
+                (color_pb[1] * 255.0) as u8,
+                (color_pb[2] * 255.0) as u8
+            ]);
+        }
 
         self.cpu_speed = self.gui.cpu_speed() as u32;
         self.cpu.set_quirk_load_store(self.gui.flag_quirk_load_store());
