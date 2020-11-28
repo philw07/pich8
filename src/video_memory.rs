@@ -1,5 +1,4 @@
 use bitvec::{bitarr, array::BitArray, order::Msb0};
-use getset::{Getters, Setters};
 use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -17,12 +16,11 @@ pub enum Plane {
     Both,
 }
 
-#[derive(Getters, Setters, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct VideoMemory {
     vmem1: [BitArray<Msb0, [u64; 32]>; 4],
     vmem2: [BitArray<Msb0, [u64; 32]>; 4],
-    #[getset(get = "pub", set = "pub")]
-    video_mode: VideoMode,
+    pub video_mode: VideoMode,
     plane: Plane,
 }
 
@@ -250,13 +248,13 @@ mod video_memory_test {
         assert_eq!(vmem.height(), 32);
         assert_eq!(vmem.render_width(), 128);
         assert_eq!(vmem.render_height(), 64);
-        vmem.set_video_mode(VideoMode::HiRes);
+        vmem.video_mode = VideoMode::HiRes;
         assert_eq!(vmem.video_mode, VideoMode::HiRes);
         assert_eq!(vmem.width(), 64);
         assert_eq!(vmem.height(), 64);
         assert_eq!(vmem.render_width(), 64);
         assert_eq!(vmem.render_height(), 64);
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         assert_eq!(vmem.video_mode, VideoMode::Extended);
         assert_eq!(vmem.width(), 128);
         assert_eq!(vmem.height(), 64);
@@ -268,7 +266,7 @@ mod video_memory_test {
     #[should_panic]
     fn test_get_index_out_of_bounds_hires() {
         let mut vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::HiRes);
+        vmem.video_mode = VideoMode::HiRes;
         let _ = vmem.get_index_plane(vmem.plane, 64*64);
     }
 
@@ -276,7 +274,7 @@ mod video_memory_test {
     #[should_panic]
     fn test_get_index_out_of_bounds_default_and_extended() {
         let mut vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         let _ = vmem.get_index_plane(vmem.plane, 128*64);
     }
 
@@ -295,12 +293,12 @@ mod video_memory_test {
         assert_eq!(vmem.get_plane(vmem.plane, 32, 20), true);
         // Set - HiRes
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::HiRes);
+        vmem.video_mode = VideoMode::HiRes;
         vmem.set_plane(vmem.plane, 32, 50, true);
         assert_eq!(vmem.get_plane(vmem.plane, 32, 50), true);
         // Set - Extended
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_plane(vmem.plane, 100, 50, true);
         assert_eq!(vmem.get_plane(vmem.plane, 100, 50), true);
 
@@ -312,14 +310,14 @@ mod video_memory_test {
         }
         // Set all - HiRes
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::HiRes);
+        vmem.video_mode = VideoMode::HiRes;
         vmem.set_all(true);
         for i in 0..64*64 {
             assert_eq!(vmem.get_index_plane(vmem.plane, i), true);
         }
         // Set all - Extended
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
         for i in 0..128*64 {
             assert_eq!(vmem.get_index_plane(vmem.plane, i), true);
@@ -334,7 +332,7 @@ mod video_memory_test {
         }
         // Clear - Default
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::HiRes);
+        vmem.video_mode = VideoMode::HiRes;
         vmem.set_all(true);
         vmem.clear();
         for i in 0..64*64 {
@@ -342,7 +340,7 @@ mod video_memory_test {
         }
         // Clear - Default
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
         vmem.clear();
         for i in 0..128*64 {
@@ -351,7 +349,7 @@ mod video_memory_test {
 
         // Scroll down
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
         for x in 0..128 {
             vmem.set_plane(vmem.plane, x, 35, false);
@@ -366,7 +364,7 @@ mod video_memory_test {
 
         // Scroll up
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
         for x in 0..128 {
             vmem.set_plane(vmem.plane, x, 35, false);
@@ -381,7 +379,7 @@ mod video_memory_test {
 
         // Scroll left
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
         for y in 0..64 {
             vmem.set_plane(vmem.plane, 108, y, false);
@@ -396,7 +394,7 @@ mod video_memory_test {
 
         // Scroll right
         vmem = VideoMemory::new();
-        vmem.set_video_mode(VideoMode::Extended);
+        vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
         for y in 0..64 {
             vmem.set_plane(vmem.plane, 99, y, false);
@@ -443,7 +441,7 @@ mod video_memory_test {
             // Scroll down
             vmem = VideoMemory::new();
             vmem.select_plane(plane);
-            vmem.set_video_mode(VideoMode::Extended);
+            vmem.video_mode = VideoMode::Extended;
             vmem.set_all(true);
             for x in 0..128 {
                 vmem.set_plane(vmem.plane, x, 35, false);
@@ -461,7 +459,7 @@ mod video_memory_test {
             // Scroll up
             vmem = VideoMemory::new();
             vmem.select_plane(plane);
-            vmem.set_video_mode(VideoMode::Extended);
+            vmem.video_mode = VideoMode::Extended;
             vmem.set_all(true);
             for x in 0..128 {
                 vmem.set_plane(vmem.plane, x, 35, false);
@@ -479,7 +477,7 @@ mod video_memory_test {
             // Scroll left
             vmem = VideoMemory::new();
             vmem.select_plane(plane);
-            vmem.set_video_mode(VideoMode::Extended);
+            vmem.video_mode = VideoMode::Extended;
             vmem.set_all(true);
             for y in 0..64 {
                 vmem.set_plane(vmem.plane, 108, y, false);
@@ -497,7 +495,7 @@ mod video_memory_test {
             // Scroll right
             vmem = VideoMemory::new();
             vmem.select_plane(plane);
-            vmem.set_video_mode(VideoMode::Extended);
+            vmem.video_mode = VideoMode::Extended;
             vmem.set_all(true);
             for y in 0..64 {
                 vmem.set_plane(vmem.plane, 99, y, false);

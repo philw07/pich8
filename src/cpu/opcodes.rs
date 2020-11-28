@@ -62,21 +62,21 @@ impl CPU {
     // 0x00FE - SCHIP - Disable extended screen mode
     #[inline]
     pub(super) fn opcode_schip_0x00FE(&mut self) {
-        self.vmem.set_video_mode(VideoMode::Default);
+        self.vmem.video_mode = VideoMode::Default;
         self.PC += 2;
     }
 
     // 0x00FF - SCHIP - Enable extended screen mode
     #[inline]
     pub(super) fn opcode_schip_0x00FF(&mut self) {
-        self.vmem.set_video_mode(VideoMode::Extended);
+        self.vmem.video_mode = VideoMode::Extended;
         self.PC += 2;
     }
 
     // 0x0230 - HiRes - Clear screen
     #[inline]
     pub(super) fn opcode_hires_0x0230(&mut self) {
-        if self.vmem.video_mode() == &VideoMode::HiRes {
+        if self.vmem.video_mode == VideoMode::HiRes {
             self.vmem.clear();
             self.draw = true;
             self.PC += 2;
@@ -101,7 +101,7 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_0x1260(&mut self, nnn: u16) {
         if self.PC == 0x200 {
-            self.vmem.set_video_mode(VideoMode::HiRes);
+            self.vmem.video_mode = VideoMode::HiRes;
             self.PC = 0x2C0;
         } else {
             self.opcode_0x1NNN(nnn);

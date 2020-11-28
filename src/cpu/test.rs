@@ -472,10 +472,10 @@ fn test_opcodes_schip() {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0x00, 0xFF, 0x00, 0xFE]);
         let _ = cpu.emulate_cycle();
-        assert_eq!(cpu.vmem.video_mode(), &VideoMode::Extended);
+        assert_eq!(cpu.vmem.video_mode, VideoMode::Extended);
         assert_eq!(cpu.PC, 0x202);
         let _ = cpu.emulate_cycle();
-        assert_eq!(cpu.vmem.video_mode(), &VideoMode::Default);
+        assert_eq!(cpu.vmem.video_mode, VideoMode::Default);
         assert_eq!(cpu.PC, 0x204);
     }
 
@@ -485,7 +485,7 @@ fn test_opcodes_schip() {
         let _ = cpu.load_rom(&[0x00, 0xFF, 0xD0, 0x10]);
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.PC, 0x202);
-        assert_eq!(cpu.vmem.video_mode(), &VideoMode::Extended);
+        assert_eq!(cpu.vmem.video_mode, VideoMode::Extended);
         cpu.V[0] = 65;
         cpu.V[1] = 2;
         cpu.I = 0x300;

@@ -70,13 +70,13 @@ impl Emulator {
         let display = WindowDisplay::new(&event_loop, vsync)?;
         let mut cpu = CPU::new();
         cpu.load_bootrom();
-        cpu.set_draw(true);
+        cpu.draw = true;
         let cpu_speed = Emulator::CPU_FREQUENCY as u32;
 
         // Initialize GUI
         let mut gui = GUI::new(display.display());
-        gui.set_cpu_speed(cpu_speed);
-        gui.set_volume(0.25);
+        gui.cpu_speed = cpu_speed;
+        gui.volume = 0.25;
 
         let now = Instant::now();
         Ok(Self{
@@ -112,7 +112,7 @@ impl Emulator {
             LoadedType::Rom(rom) => {
                 self.cpu = CPU::new();
                 match self.cpu.load_rom(&rom) {
-                    Ok(_) => if !self.gui.flag_debug() { self.gui.set_flag_pause(false); },
+                    Ok(_) => if !self.gui.flag_debug { self.gui.flag_pause = false; },
                     Err(_) => self.gui.display_error("Data is not a valid ROM!"),
                 }
             },
@@ -121,7 +121,7 @@ impl Emulator {
                     Ok(cpu) => self.cpu = cpu,
                     Err(msg) => self.gui.display_error(&msg),
                 }
-                self.gui.set_flag_pause(false);
+                self.gui.flag_pause = false;
             },
             _ => (),
         }
@@ -154,11 +154,11 @@ impl Emulator {
         if self.rom_downloader.is_active() {
             match self.rom_downloader.check_result() {
                 DownloadResult::Success(data) => {
-                    self.gui.set_flag_downloading(false);
+                    self.gui.flag_downloading = false;
                     self.load_rom(&data);
                 },
                 DownloadResult::Fail(msg) => {
-                    self.gui.set_flag_downloading(false);
+                    self.gui.flag_downloading = false;
                     self.gui.display_error(&msg);
                 },
                 DownloadResult::None => (),
@@ -206,7 +206,7 @@ impl Emulator {
 
                 #[cfg(feature = "rom-download")]
                 FileDialogResult::InputUrl(url) => {
-                    self.gui.set_flag_downloading(true);
+                    self.gui.flag_downloading = true;
                     match url::Url::parse(&url) {
                         Ok(url) => self.rom_downloader.download(url),
                         Err(e) => self.gui.display_error(&format!("Invalid URL: {}", e)),    
@@ -240,8 +240,8 @@ impl Emulator {
                                     self.gui.display_error(&format!("Error: {}", e));
                                     continue;
                                 }
-                                if self.gui.flag_debug() && self.check_breakpoints() {
-                                    self.gui.set_flag_pause(true);
+                                if self.gui.flag_debug && self.check_breakpoints() {
+                                    self.gui.flag_pause = true;
                                     break;
                                 }
                             }
@@ -296,7 +296,7 @@ impl Emulator {
 
                     let is_fullscreen = self.display.fullscreen();
                     let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
-                    let vmem = if self.force_redraw || self.cpu.draw() { self.cpu.set_draw(false); Some(self.cpu.vmem()) } else { None };
+                    let vmem = if self.force_redraw || self.cpu.draw { self.cpu.draw = false; Some(self.cpu.vmem()) } else { None };
                     let mut frame = self.display.prepare(vmem, height).expect("Failed to prepare frame");
                     if !is_fullscreen {
                         self.gui.render(frame_duration, self.display.display(), &mut frame, fps, &self.cpu).expect("Failed to render GUI");
@@ -321,83 +321,83 @@ impl Emulator {
             pause = true;
         }
 
-        if self.gui.flag_open() {
+        if self.gui.flag_open {
             self.dialog_handler.open_file_dialog(FileDialogType::OpenRom);
-            self.gui.set_flag_open(false);
+            self.gui.flag_open = false;
         }
 
         #[cfg(feature = "rom-download")]
-        if self.gui.flag_open_rom_url() {
+        if self.gui.flag_open_rom_url {
             self.dialog_handler.open_file_dialog(FileDialogType::InputUrl);
-            self.gui.set_flag_open_rom_url(false);
+            self.gui.flag_open_rom_url = false;
         }
 
-        if self.gui.flag_save_state() {
+        if self.gui.flag_save_state {
             self.dialog_handler.open_file_dialog(FileDialogType::SaveState);
-            self.gui.set_flag_save_state(false);
+            self.gui.flag_save_state = false;
         }
-        if self.gui.flag_reset() {
+        if self.gui.flag_reset {
             self.reset();
-            self.gui.set_flag_reset(false);
+            self.gui.flag_reset = false;
         }
-        if self.gui.flag_exit() {
+        if self.gui.flag_exit {
             *ctrl_flow = ControlFlow::Exit;
-            self.gui.set_flag_exit(false);
+            self.gui.flag_exit = false;
         }
-        if self.gui.flag_fullscreen() != fullscreen {
+        if self.gui.flag_fullscreen != fullscreen {
             let _ = self.display.toggle_fullscreen();
         }
-        if self.gui.flag_pause() {
+        if self.gui.flag_pause {
             pause = true;
         }
 
-        let mut color_settings = self.gui.color_settings_mut();
+        let color_settings = self.gui.color_settings();
         self.force_redraw = color_settings.changed;
         if color_settings.changed {
             color_settings.changed = false;
 
             let color_bg = color_settings.get(Color::Background);
-            self.display.set_color_bg([
+            self.display.color_bg = [
                 (color_bg[0] * 255.0) as u8,
                 (color_bg[1] * 255.0) as u8,
                 (color_bg[2] * 255.0) as u8
-            ]);
+            ];
             let color_p1 = color_settings.get(Color::Plane1);
-            self.display.set_color_plane_1([
+            self.display.color_plane_1 = [
                 (color_p1[0] * 255.0) as u8,
                 (color_p1[1] * 255.0) as u8,
                 (color_p1[2] * 255.0) as u8
-            ]);
+            ];
             let color_p2 = color_settings.get(Color::Plane2);
-            self.display.set_color_plane_2([
+            self.display.color_plane_2 = [
                 (color_p2[0] * 255.0) as u8,
                 (color_p2[1] * 255.0) as u8,
                 (color_p2[2] * 255.0) as u8
-            ]);
+            ];
             let color_pb = color_settings.get(Color::PlaneBoth);
-            self.display.set_color_plane_both([
+            self.display.color_plane_both = [
                 (color_pb[0] * 255.0) as u8,
                 (color_pb[1] * 255.0) as u8,
                 (color_pb[2] * 255.0) as u8
-            ]);
+            ];
         }
 
-        self.cpu_speed = self.gui.cpu_speed() as u32;
-        self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
-        self.mute = self.gui.flag_mute();
-        self.sound.set_volume(self.gui.volume());
+        self.cpu_speed = self.gui.cpu_speed as u32;
+        self.cpu.vertical_wrapping = self.gui.flag_vertical_wrapping;
+        self.mute = self.gui.flag_mute;
+        self.sound.set_volume(self.gui.volume);
 
         let quirks = self.gui.quirks_settings();
-        self.cpu.set_quirk_load_store(quirks.get(Quirk::LoadStore));
-        self.cpu.set_quirk_shift(quirks.get(Quirk::Shift));
-        self.cpu.set_quirk_draw(quirks.get(Quirk::Draw));
-        self.cpu.set_quirk_jump(quirks.get(Quirk::Jump));
-        self.cpu.set_quirk_vf_order(quirks.get(Quirk::VfOrder));
+        self.cpu.quirk_load_store = quirks.get(Quirk::LoadStore);
+        self.cpu.quirk_shift = quirks.get(Quirk::Shift);
+        self.cpu.quirk_draw = quirks.get(Quirk::Draw);
+        self.cpu.quirk_jump = quirks.get(Quirk::Jump);
+        self.cpu.quirk_vf_order = quirks.get(Quirk::VfOrder);
         
-        self.step = self.gui.flag_step();
-        self.gui.set_flag_step(false);
-        self.step_timers = self.gui.flag_step_timers();
-        self.gui.set_flag_step_timers(false);
+        self.step = self.gui.flag_step;
+        self.gui.flag_step = false;
+        self.step_timers = self.gui.flag_step_timers;
+        self.gui.flag_step_timers = false;
 
         if pause != self.pause {
             self.set_pause(pause);
@@ -457,25 +457,25 @@ impl Emulator {
             match (scancode, keycode, state, ctrl, shift) {
                 // Command keys
                 #[cfg(feature = "rom-download")]
-                (_, O, Pressed, true, true) => { self.gui.set_flag_open_rom_url(true); },
+                (_, O, Pressed, true, true) => { self.gui.flag_open_rom_url = true; },
 
                 (_, Escape, Pressed, _, _) => {
-                    if self.gui.flag_fullscreen() {
-                        self.gui.set_flag_fullscreen(false);
+                    if self.gui.flag_fullscreen {
+                        self.gui.flag_fullscreen = false;
                     } else {
                         *ctrl_flow = ControlFlow::Exit;
                     }
                 },
-                (_, F1, Pressed, _, _) => { self.gui.set_flag_display_fps(!self.gui.flag_display_fps()); },
-                (_, F5, Pressed, _, _) => { self.gui.set_flag_reset(true); },
-                (_, F7, Pressed, _, _) => { self.gui.set_flag_debug(!self.gui.flag_debug()); },
-                (_, F8, Pressed, _, _) => { self.gui.set_flag_step(true); },
-                (_, F9, Pressed, _, _) => { self.gui.set_flag_step_timers(true); },
-                (_, F11, Pressed, _, _) => { self.gui.set_flag_fullscreen(!self.gui.flag_fullscreen()); },
-                (_, P, Pressed, _, _) => { self.gui.set_flag_pause(!self.gui.flag_pause()); },
-                (_, M, Pressed, _, _) => { self.gui.set_flag_mute(!self.gui.flag_mute()); },
-                (_, O, Pressed, true, _) => { self.gui.set_flag_open(true); },
-                (_, S, Pressed, true, _) => { self.gui.set_flag_save_state(true); },
+                (_, F1, Pressed, _, _) => { self.gui.flag_display_fps = !self.gui.flag_display_fps; },
+                (_, F5, Pressed, _, _) => { self.gui.flag_reset = true; },
+                (_, F7, Pressed, _, _) => { self.gui.flag_debug = !self.gui.flag_debug; },
+                (_, F8, Pressed, _, _) => { self.gui.flag_step = true; },
+                (_, F9, Pressed, _, _) => { self.gui.flag_step_timers = true; },
+                (_, F11, Pressed, _, _) => { self.gui.flag_fullscreen = !self.gui.flag_fullscreen; },
+                (_, P, Pressed, _, _) => { self.gui.flag_pause = !self.gui.flag_pause; },
+                (_, M, Pressed, _, _) => { self.gui.flag_mute = !self.gui.flag_mute; },
+                (_, O, Pressed, true, _) => { self.gui.flag_open = true; },
+                (_, S, Pressed, true, _) => { self.gui.flag_save_state = true; },
 
                 // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
                 (SCANCODE_1, _, Pressed, _, _)     => self.input.set(1, true),

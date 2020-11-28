@@ -7,7 +7,6 @@ use quirks_presets::{QuirksPresetHandler, QuirksPreset};
 use color_presets::{ColorPresetHandler, ColorPreset};
 use std::time::Duration;
 use glium::{Display, Surface, glutin::event::Event};
-use getset::{CopyGetters, Getters, MutGetters, Setters};
 use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition, ImString, ImStr, StyleColor, Slider};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
@@ -17,7 +16,6 @@ mod quirks_presets;
 mod color_settings;
 mod color_presets;
 
-#[derive(CopyGetters, Getters, MutGetters, Setters)]
 pub struct GUI {
     imgui: Context,
     renderer: Renderer,
@@ -29,73 +27,48 @@ pub struct GUI {
     // For convenience we're only reporting the height of the last frame
     last_menu_height: u32,
     
-    #[getset(get_copy = "pub")]
     is_open: bool,
 
     // Flags
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_open: bool,
+    pub flag_open: bool,
 
     #[cfg(feature = "rom-download")]
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_open_rom_url: bool,
+    pub flag_open_rom_url: bool,
 
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_save_state: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_reset: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_exit: bool,
+    pub flag_save_state: bool,
+    pub flag_reset: bool,
+    pub flag_exit: bool,
 
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_fullscreen: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_display_fps: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_debug: bool,
+    pub flag_fullscreen: bool,
+    pub flag_display_fps: bool,
+    pub flag_debug: bool,
 
-    #[getset(get_mut = "pub")]
     color_settings: ColorSettings,
 
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_pause: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    cpu_speed: u32,
+    pub flag_pause: bool,
+    pub cpu_speed: u32,
     cpu_multiplier: u32,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_vertical_wrapping: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_mute: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    volume: f32,
+    pub flag_vertical_wrapping: bool,
+    pub flag_mute: bool,
+    pub volume: f32,
 
-    #[getset(get = "pub")]
     quirks_settings: QuirksSettings,
 
     flag_about: bool,
     flag_error: bool,
     error_text: ImString,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_downloading: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_step: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_step_timers: bool,
+    pub flag_downloading: bool,
+    pub flag_step: bool,
+    pub flag_step_timers: bool,
 
-    #[getset(get_copy = "pub")]
     flag_breakpoint_pc: bool,
     breakpoint_pc_im: ImString,
-    #[getset(get = "pub")]
     breakpoint_pc: String,
-    #[getset(get_copy = "pub")]
     flag_breakpoint_i: bool,
     breakpoint_i_im: ImString,
-    #[getset(get = "pub")]
     breakpoint_i: String,
-    #[getset(get_copy = "pub")]
     flag_breakpoint_opcode: bool,
     breakpoint_opcode_im: ImString,
-    #[getset(get = "pub")]
     breakpoint_opcode: String,
 
     about_name: ImString,
@@ -221,6 +194,16 @@ impl GUI {
             about_license: ImString::from(format!("Released under the {} license", env!("CARGO_PKG_LICENSE").to_string())),
         }
     }
+
+    pub fn is_open(&self) -> bool { self.is_open }
+    pub fn color_settings(&mut self) -> &mut ColorSettings { &mut self.color_settings }
+    pub fn quirks_settings(&self) -> &QuirksSettings { &self.quirks_settings }
+    pub fn flag_breakpoint_pc(&self) -> bool { self.flag_breakpoint_pc }
+    pub fn breakpoint_pc(&self) -> &str { &self.breakpoint_pc }
+    pub fn flag_breakpoint_i(&self) -> bool { self.flag_breakpoint_i }
+    pub fn breakpoint_i(&self) -> &str { &self.breakpoint_i }
+    pub fn flag_breakpoint_opcode(&self) -> bool { self.flag_breakpoint_opcode }
+    pub fn breakpoint_opcode(&self) -> &str { &self.breakpoint_opcode }
 
     pub fn handle_event<T>(&mut self, display: &Display, event: &Event<T>) {
         let gl_window = display.gl_window();

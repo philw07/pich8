@@ -1,5 +1,4 @@
 use std::sync::mpsc::Receiver;
-use getset::{CopyGetters, Getters};
 
 pub enum FileDialogType {
     OpenRom,
@@ -21,9 +20,7 @@ pub enum FileDialogResult {
 /// This module handles dialogs in a separate thread.
 /// Unforutnately, it's necessary due to a bug in the winit event loop.
 /// See https://github.com/rust-windowing/winit/issues/1698
-#[derive(CopyGetters, Getters)]
 pub struct DialogHandler {
-    #[getset(get_copy = "pub")]
     is_open: bool,
     chan_rx: Option<Receiver<FileDialogResult>>,
 }
@@ -38,6 +35,8 @@ impl DialogHandler {
             chan_rx: None,
         }
     }
+
+    pub fn is_open(&self) -> bool { self.is_open }
 
     pub fn open_file_dialog(&mut self, dialog_type: FileDialogType) {
         self.is_open = true;

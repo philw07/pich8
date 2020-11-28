@@ -1,6 +1,5 @@
 use std::sync::mpsc::Receiver;
 use url::Url;
-use getset::CopyGetters;
 
 pub enum DownloadResult {
     Success(Vec<u8>),
@@ -8,9 +7,7 @@ pub enum DownloadResult {
     None,
 }
 
-#[derive(CopyGetters)]
 pub struct RomDownloader {
-    #[getset(get_copy = "pub")]
     is_active: bool,
     chan_rx: Option<Receiver<DownloadResult>>,
 }
@@ -22,6 +19,8 @@ impl RomDownloader {
             chan_rx: None,
         }
     }
+
+    pub fn is_active(&self) -> bool { self.is_active }
 
     pub fn download(&mut self, url: Url) {
         self.is_active = true;

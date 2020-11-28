@@ -1,5 +1,4 @@
 use crate::video_memory::{VideoMemory, Plane};
-use getset::{Getters, Setters};
 use glium::{
     Display,
     glutin::{
@@ -18,20 +17,15 @@ use glium::{
     },
 };
 
-#[derive(Getters, Setters)]
 pub struct WindowDisplay {
     display: Display,
     frame_buffer: [u8; 2*WindowDisplay::C8_WIDTH * 2*WindowDisplay::C8_HEIGHT * 3],
     width: u32,
     height: u32,
-    #[getset(get = "pub", set = "pub")]
-    color_bg: [u8; 3],
-    #[getset(get = "pub", set = "pub")]
-    color_plane_1: [u8; 3],
-    #[getset(get = "pub", set = "pub")]
-    color_plane_2: [u8; 3],
-    #[getset(get = "pub", set = "pub")]
-    color_plane_both: [u8; 3],
+    pub color_bg: [u8; 3],
+    pub color_plane_1: [u8; 3],
+    pub color_plane_2: [u8; 3],
+    pub color_plane_both: [u8; 3],
 }
 
 impl WindowDisplay {

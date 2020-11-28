@@ -1,7 +1,6 @@
 use std::fmt;
 use rand::prelude::*;
 use bitvec::prelude::*;
-use getset::{CopyGetters, Getters, Setters};
 use serde::{Serialize, Deserialize};
 use crate::video_memory::{VideoMemory, VideoMode, Plane};
 
@@ -44,63 +43,43 @@ pub enum Breakpoint {
 }
 
 #[allow(non_snake_case)]
-#[derive(CopyGetters, Getters, Setters, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct CPU {
     mem: Box<[u8]>,                         // Main memory
-    #[getset(get = "pub")]
     vmem: VideoMemory,                      // Graphics memory
-    #[getset(get_copy = "pub")]
     stack: [u16; 16],                       // Stack to store locations before a jump occurs
     keys: BitArray<Msb0, [u16; 1]>,         // Keypad status
-    #[getset(get = "pub")]
     audio_buffer: Option<[u8; 16]>,         // XO-CHIP audio buffer
 
-    #[getset(get_copy = "pub")]
     PC: u16,                                // Program counter
-    #[getset(get_copy = "pub")]
     V: [u8; 16],                            // Registers
-    #[getset(get_copy = "pub")]
     I: u16,                                 // Index register
-    #[getset(get_copy = "pub")]
     DT: u8,                                 // Delay timer
-    #[getset(get_copy = "pub")]
     ST: u8,                                 // Sound timer
-    #[getset(get_copy = "pub")]
     RPL: [u8; 8],                           // HP48 RPL flags (used for S-CHIP)
 
-    #[getset(get_copy = "pub")]
     opcode: u16,                            // Current opcode
-    #[getset(get = "pub")]
     opcode_description: String,             // Current opcode description
-    #[getset(get_copy = "pub")]
     next_opcode: u16,                       // Next opcode
-    #[getset(get = "pub")]
     next_opcode_description: String,        // Next opcode description
     next_opcode_ext: u16,                   // Next opcode extension in case of 32bit opcode (XO-CHIP)
-    #[getset(get_copy = "pub")]
     sp: usize,                              // Current stack position
 
-    #[getset(get_copy = "pub", set = "pub")]
-    draw: bool,                             // Drawing flag
+    pub draw: bool,                         // Drawing flag
     key_wait: bool,                         // Key wait flag
     key_reg: usize,                         // Key wait register
-    #[getset(get_copy = "pub", set = "pub")]
-    quirk_load_store: bool,                 // Flag for load store quirk
-    #[getset(get_copy = "pub", set = "pub")]
-    quirk_shift: bool,                      // Flag for shift quirk
-    #[getset(get_copy = "pub", set = "pub")]
-    quirk_jump: bool,                       // Flag for jump0 quirk
-    #[getset(get_copy = "pub", set = "pub")]
-    quirk_vf_order: bool,                   // Flag for VF order quirk
+    pub quirk_load_store: bool,             // Flag for load store quirk
+    pub quirk_shift: bool,                  // Flag for shift quirk
+    pub quirk_jump: bool,                   // Flag for jump0 quirk
+    pub quirk_vf_order: bool,               // Flag for VF order quirk
     // Originally, a 16x16 sprite is only drawn if n == 0 AND extended display mode (128x64) is active (CHIP8.DOC by David Winter).
     // In default mode (64x32) however, if n (height) == 0, a 8x16 pixels sprite is drawn.
     // However, Octo and many other emulators only check for n == 0, so some ROMs (e.g. Eaty the Alien) assume this check instead.
-    #[getset(get_copy = "pub", set = "pub")]
-    quirk_draw: bool,                       // Flag for draw quirk
-    #[getset(get_copy = "pub", set = "pub")]
-    vertical_wrapping: bool,                // Flag for vertical wrapping
+    pub quirk_draw: bool,                       // Flag for draw quirk
+    pub vertical_wrapping: bool,                // Flag for vertical wrapping
 }
 
+#[allow(non_snake_case)]
 impl CPU {
     const BOOTROM: &'static [u8] = include_bytes!("../../data/bootrom/pich8-logo.ch8");
     const PC_INITIAL: u16 = 0x200;
@@ -190,7 +169,7 @@ impl CPU {
 
     pub fn load_rom(&mut self, prog: &[u8]) -> Result<(), String> {
         if prog.len() <= self.mem.len() - 0x200 {
-            self.vmem.set_video_mode(VideoMode::Default);
+            self.vmem.video_mode = VideoMode::Default;
             &self.mem[0x200..0x200+prog.len()].copy_from_slice(prog);
             self.PC = CPU::PC_INITIAL;
             self.sp = 0;
@@ -200,6 +179,20 @@ impl CPU {
             Err("Invalid ROM!".to_string())
         }
     }
+
+    pub fn vmem(&self) -> &VideoMemory { &self.vmem }
+    pub fn stack(&self) -> [u16; 16] { self.stack }
+    pub fn audio_buffer(&self) -> Option<[u8; 16]> { self.audio_buffer }
+    pub fn PC(&self) -> u16 { self.PC }
+    pub fn V(&self) -> [u8; 16] { self.V }
+    pub fn I(&self) -> u16 { self.I }
+    pub fn DT(&self) -> u8 { self.DT }
+    pub fn ST(&self) -> u8 { self.ST }
+    pub fn opcode(&self) -> u16 { self.opcode }
+    pub fn opcode_description(&self) -> &str { &self.opcode_description }
+    pub fn next_opcode(&self) -> u16 { self.next_opcode }
+    pub fn next_opcode_description(&self) -> &str { &self.next_opcode_description }
+    pub fn sp(&self) -> usize { self.sp }
 
     pub fn update_timers(&mut self) {
         if self.DT > 0 {
@@ -351,7 +344,7 @@ impl CPU {
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {
-        let big_sprite = (self.vmem.video_mode() == &VideoMode::Extended || self.quirk_draw) && height == 0;
+        let big_sprite = (self.vmem.video_mode == VideoMode::Extended || self.quirk_draw) && height == 0;
         let step = if big_sprite { 2 } else { 1 };
         let width = if big_sprite { 16 } else { 8 };
         let height = if height == 0 { 16 } else { height };
@@ -419,7 +412,7 @@ impl CPU {
             (  0,   0, 0xF, 0xD) => String::from("EXIT [S-CHIP]"),
             (  0,   0, 0xF, 0xE) => String::from("LOW [S-CHIP]"),
             (  0,   0, 0xF, 0xF) => String::from("HIGH [S-CHIP]"),
-            (  0,   2,   3,   0) => if self.vmem.video_mode() == &VideoMode::HiRes { String::from("CLS [HiRes]") } else { format!("SYS {:03X} (Ignored)", nnn) },
+            (  0,   2,   3,   0) => if self.vmem.video_mode == VideoMode::HiRes { String::from("CLS [HiRes]") } else { format!("SYS {:03X} (Ignored)", nnn) },
 
             (  1,   2,   6,   0) => if self.PC == 0x200 { String::from("HIRES [HiRes]") } else { format!("JP {:03X}", nnn) },
             (  1, _  , _  , _  ) => format!("JP {:03X}", nnn),
