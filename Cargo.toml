@@ -5,6 +5,7 @@ description = "A cross-platform CHIP-8, SUPER-CHIP and XO-CHIP interpreter and d
 authors = ["Philipp W <phil.w07@gmail.com>"]
 edition = "2018"
 build = "build.rs"
+license = "MIT"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.11"

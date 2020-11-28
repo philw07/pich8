@@ -106,6 +106,7 @@ pub struct GUI {
     about_name: ImString,
     about_version: ImString,
     about_description: ImString,
+    about_license: ImString,
 }
 
 impl GUI {
@@ -245,6 +246,7 @@ impl GUI {
             about_name: ImString::from(env!("CARGO_PKG_NAME").to_string()),
             about_version: ImString::from(env!("CARGO_PKG_VERSION").to_string()),
             about_description: ImString::from(env!("CARGO_PKG_DESCRIPTION").to_string()),
+            about_license: ImString::from(format!("Released under the {} license", env!("CARGO_PKG_LICENSE").to_string())),
         }
     }
 
@@ -262,6 +264,7 @@ impl GUI {
         let about_name = &self.about_name;
         let about_version = &self.about_version;
         let about_description = &self.about_description;
+        let about_license = &self.about_license;
 
         let window_width = display.gl_window().window().inner_size().width as f32;
         let window_height = display.gl_window().window().inner_size().height as f32;
@@ -442,8 +445,9 @@ impl GUI {
                 self.is_open = true;
                 let app_name_size = ui.calc_text_size(about_name, false, 0.0);
                 let app_version_size = ui.calc_text_size(about_version, false, 0.0);
+                let app_license_size = ui.calc_text_size(about_license, false, 0.0);
                 let about_text_size = ui.calc_text_size(about_description, false, 250.0);
-                let about_win_size = [about_text_size[0] + 50.0, about_text_size[1] + app_name_size[1] + app_version_size[1] + 60.0];
+                let about_win_size = [about_text_size[0] + 50.0, about_text_size[1] + app_name_size[1] + app_version_size[1] + app_license_size[1] + 65.0];
                 let about_win_pos = [
                     window_width / 2.0 - about_win_size[0] / 2.0,
                     window_height / 2.0 - about_win_size[1] / 2.0
@@ -466,6 +470,9 @@ impl GUI {
                         ui.spacing();
                         ui.set_cursor_pos([about_win_size[0] / 2.0 - about_text_size[0] / 2.0, ui.cursor_pos()[1]]);
                         ui.text_wrapped(about_description);
+
+                        ui.spacing();
+                        Self::centered_text(&ui, about_license, about_win_size[0]);
                     });
             }
             if self.flag_error {
