@@ -4,6 +4,7 @@ use crate::gui::GUI;
 use crate::sound::AudioPlayer;
 use crate::dialog_handler::{DialogHandler, FileDialogResult, FileDialogType};
 use crate::fps_counter::FpsCounter;
+use crate::gui::{Quirk, Color};
 use std::{time::Instant, fs};
 use bitvec::prelude::*;
 use glium::{
@@ -350,30 +351,30 @@ impl Emulator {
             pause = true;
         }
 
-        self.force_redraw = false;
-        if self.gui.flag_color_changed() {
-            self.gui.set_flag_color_changed(false);
-            self.force_redraw = true;
+        let mut color_settings = self.gui.color_settings_mut();
+        self.force_redraw = color_settings.changed;
+        if color_settings.changed {
+            color_settings.changed = false;
 
-            let color_bg = self.gui.color_bg();
+            let color_bg = color_settings.get(Color::Background);
             self.display.set_color_bg([
                 (color_bg[0] * 255.0) as u8,
                 (color_bg[1] * 255.0) as u8,
                 (color_bg[2] * 255.0) as u8
             ]);
-            let color_p1 = self.gui.color_plane_1();
+            let color_p1 = color_settings.get(Color::Plane1);
             self.display.set_color_plane_1([
                 (color_p1[0] * 255.0) as u8,
                 (color_p1[1] * 255.0) as u8,
                 (color_p1[2] * 255.0) as u8
             ]);
-            let color_p2 = self.gui.color_plane_2();
+            let color_p2 = color_settings.get(Color::Plane2);
             self.display.set_color_plane_2([
                 (color_p2[0] * 255.0) as u8,
                 (color_p2[1] * 255.0) as u8,
                 (color_p2[2] * 255.0) as u8
             ]);
-            let color_pb = self.gui.color_plane_both();
+            let color_pb = color_settings.get(Color::PlaneBoth);
             self.display.set_color_plane_both([
                 (color_pb[0] * 255.0) as u8,
                 (color_pb[1] * 255.0) as u8,
@@ -382,14 +383,16 @@ impl Emulator {
         }
 
         self.cpu_speed = self.gui.cpu_speed() as u32;
-        self.cpu.set_quirk_load_store(self.gui.flag_quirk_load_store());
-        self.cpu.set_quirk_shift(self.gui.flag_quirk_shift());
-        self.cpu.set_quirk_draw(self.gui.flag_quirk_draw());
-        self.cpu.set_quirk_jump(self.gui.flag_quirk_jump());
-        self.cpu.set_quirk_vf_order(self.gui.flag_quirk_vf_order());
         self.cpu.set_vertical_wrapping(self.gui.flag_vertical_wrapping());
         self.mute = self.gui.flag_mute();
         self.sound.set_volume(self.gui.volume());
+
+        let quirks = self.gui.quirks_settings();
+        self.cpu.set_quirk_load_store(quirks.get(Quirk::LoadStore));
+        self.cpu.set_quirk_shift(quirks.get(Quirk::Shift));
+        self.cpu.set_quirk_draw(quirks.get(Quirk::Draw));
+        self.cpu.set_quirk_jump(quirks.get(Quirk::Jump));
+        self.cpu.set_quirk_vf_order(quirks.get(Quirk::VfOrder));
         
         self.step = self.gui.flag_step();
         self.gui.set_flag_step(false);

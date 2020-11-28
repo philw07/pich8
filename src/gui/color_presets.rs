@@ -1,48 +1,4 @@
-#[derive(Copy, Clone)]
-pub enum QuirksPreset {
-    Default,
-    Octo,
-}
-
-pub struct QuirksPresetHandler<'a> {
-    values: [&'a mut bool; 5],
-}
-
-impl<'a> QuirksPresetHandler<'a> {
-    const QUIRKS_PRESET_DEFAULT: [bool; 5] = [true; 5];
-    const QUIRKS_PRESET_OCTO: [bool; 5] = [false, false, true, false, true];
-
-    pub fn new(load_store: &'a mut bool, shift: &'a mut bool, draw: &'a mut bool, jump: &'a mut bool, vf_order: &'a mut bool) -> Self {
-        Self {
-            values: [load_store, shift, draw, jump, vf_order],
-        }
-    }
-
-    pub fn is_active(&self, preset: QuirksPreset) -> bool {
-        for (v1, v2) in self.values.iter().zip(self.get_preset(preset).iter()) {
-            if *v1 != v2 {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub fn set_preset(&mut self, preset: QuirksPreset) {
-        let preset = self.get_preset(preset);
-        for (v1, v2) in self.values.iter_mut().zip(preset.iter()) {
-            **v1 = *v2;
-        }
-    }
-
-    fn get_preset(&self, preset: QuirksPreset) -> [bool; 5] {
-        match preset {
-            QuirksPreset::Default => Self::QUIRKS_PRESET_DEFAULT,
-            QuirksPreset::Octo => Self::QUIRKS_PRESET_OCTO,
-        }
-    }
-}
-
+use super::ColorSettings;
 
 #[derive(Copy, Clone)]
 pub enum ColorPreset {
@@ -56,7 +12,7 @@ pub enum ColorPreset {
 }
 
 pub struct ColorPresetHandler<'a> {
-    values: [&'a mut [f32; 3]; 4],
+    settings: &'a mut ColorSettings,
 }
 
 impl<'a> ColorPresetHandler<'a> {
@@ -103,15 +59,15 @@ impl<'a> ColorPresetHandler<'a> {
         [1.0, 1.0, 1.0],
     ];
 
-    pub fn new(color_bg: &'a mut [f32; 3], color_plane_1: &'a mut [f32; 3], color_plane_2: &'a mut [f32; 3], color_plane_both: &'a mut [f32; 3]) -> Self {
+    pub fn new(settings: &'a mut ColorSettings) -> Self {
         Self {
-            values: [color_bg, color_plane_1, color_plane_2, color_plane_both],
+            settings,
         }
     }
 
     pub fn is_active(&self, preset: ColorPreset) -> bool {
-        for (v1, v2) in self.values.iter().zip(self.get_preset(preset).iter()) {
-            if *v1 != v2 {
+        for (v1, v2) in self.settings.iter().zip(self.get_preset(preset).iter()) {
+            if v1 != v2 {
                 return false;
             }
         }
@@ -121,8 +77,8 @@ impl<'a> ColorPresetHandler<'a> {
 
     pub fn set_preset(&mut self, preset: ColorPreset) {
         let preset = self.get_preset(preset);
-        for (v1, v2) in self.values.iter_mut().zip(preset.iter()) {
-            **v1 = *v2;
+        for (v1, v2) in self.settings.iter_mut().zip(preset.iter()) {
+            *v1 = *v2;
         }
     }
 

@@ -1,13 +1,23 @@
 use crate::cpu::CPU;
-use crate::preset_handler::{QuirksPresetHandler, QuirksPreset, ColorPresetHandler, ColorPreset};
+use quirks_settings::QuirksSettings;
+pub use quirks_settings::Quirk;
+use color_settings::ColorSettings;
+pub use color_settings::Color;
+use quirks_presets::{QuirksPresetHandler, QuirksPreset};
+use color_presets::{ColorPresetHandler, ColorPreset};
 use std::time::Duration;
 use glium::{Display, Surface, glutin::event::Event};
-use getset::{CopyGetters, Getters, Setters};
+use getset::{CopyGetters, Getters, MutGetters, Setters};
 use imgui::{Context, MenuItem, im_str, FontSource, FontId, Ui, ColorEdit, Window, Condition, ImString, ImStr, StyleColor, Slider};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 
-#[derive(CopyGetters, Getters, Setters)]
+mod quirks_settings;
+mod quirks_presets;
+mod color_settings;
+mod color_presets;
+
+#[derive(CopyGetters, Getters, MutGetters, Setters)]
 pub struct GUI {
     imgui: Context,
     renderer: Renderer,
@@ -40,42 +50,27 @@ pub struct GUI {
     #[getset(get_copy = "pub", set = "pub")]
     flag_fullscreen: bool,
     #[getset(get_copy = "pub", set = "pub")]
-    flag_color_changed: bool,
-    #[getset(get = "pub", set = "pub")]
-    color_bg: [f32; 3],
-    #[getset(get = "pub", set = "pub")]
-    color_plane_1: [f32; 3],
-    #[getset(get = "pub", set = "pub")]
-    color_plane_2: [f32; 3],
-    #[getset(get = "pub", set = "pub")]
-    color_plane_both: [f32; 3],
-    #[getset(get_copy = "pub", set = "pub")]
     flag_display_fps: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_debug: bool,
+
+    #[getset(get_mut = "pub")]
+    color_settings: ColorSettings,
 
     #[getset(get_copy = "pub", set = "pub")]
     flag_pause: bool,
     #[getset(get_copy = "pub", set = "pub")]
     cpu_speed: u32,
     cpu_multiplier: u32,
-
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_quirk_load_store: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_quirk_shift: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_quirk_draw: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_quirk_jump: bool,
-    #[getset(get_copy = "pub", set = "pub")]
-    flag_quirk_vf_order: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_vertical_wrapping: bool,
     #[getset(get_copy = "pub", set = "pub")]
     flag_mute: bool,
     #[getset(get_copy = "pub", set = "pub")]
     volume: f32,
+
+    #[getset(get = "pub")]
+    quirks_settings: QuirksSettings,
 
     flag_about: bool,
     flag_error: bool,
@@ -120,7 +115,7 @@ impl GUI {
         imgui.set_ini_filename(None);
 
         // Load custom font
-        let roboto_data = include_bytes!("../data/fonts/Roboto/Roboto-Regular.ttf");
+        let roboto_data = include_bytes!("../../data/fonts/Roboto/Roboto-Regular.ttf");
         let roboto = imgui.fonts().add_font(&[FontSource::TtfData {
             data: roboto_data,
             size_pixels: Self::FONT_SIZE,
@@ -131,7 +126,7 @@ impl GUI {
             size_pixels: Self::FONT_SIZE + 4.0,
             config: None,
         }]);
-        let robotomono_data = include_bytes!("../data/fonts/Roboto/RobotoMono-Regular.ttf");
+        let robotomono_data = include_bytes!("../../data/fonts/Roboto/RobotoMono-Regular.ttf");
         let roboto_small = imgui.fonts().add_font(&[FontSource::TtfData {
             data: robotomono_data,
             size_pixels: Self::FONT_SIZE - 3.0,
@@ -150,29 +145,12 @@ impl GUI {
         let breakpoint_opcode = String::from(breakpoint_opcode_im.to_str());
 
         // Set default presets
-        let mut color_bg = [0.0; 3];
-        let mut color_plane_1 = [0.0; 3];
-        let mut color_plane_2 = [0.0; 3];
-        let mut color_plane_both = [0.0; 3];
-        ColorPresetHandler::new(
-            &mut color_bg,
-            &mut color_plane_1,
-            &mut color_plane_2,
-            &mut color_plane_both,
-        ).set_preset(ColorPreset::Default);
+        let mut color_settings = ColorSettings::new();
+        ColorPresetHandler::new(&mut color_settings).set_preset(ColorPreset::Default);
+        color_settings.changed = true;
 
-        let mut flag_quirk_load_store = false;
-        let mut flag_quirk_shift = false;
-        let mut flag_quirk_draw = false;
-        let mut flag_quirk_jump = false;
-        let mut flag_quirk_vf_order = false;
-        QuirksPresetHandler::new(
-            &mut flag_quirk_load_store,
-            &mut flag_quirk_shift,
-            &mut flag_quirk_draw,
-            &mut flag_quirk_jump,
-            &mut flag_quirk_vf_order
-        ).set_preset(QuirksPreset::Default);
+        let mut quirks_settings = QuirksSettings::new();
+        QuirksPresetHandler::new(&mut quirks_settings).set_preset(QuirksPreset::Default);
 
         
         // Create renderer and platform
@@ -204,11 +182,8 @@ impl GUI {
             flag_exit: false,
 
             flag_fullscreen: false,
-            flag_color_changed: true,
-            color_bg,
-            color_plane_1,
-            color_plane_2,
-            color_plane_both,
+            color_settings,
+
             flag_display_fps: false,
             flag_debug: false,
 
@@ -217,14 +192,11 @@ impl GUI {
             cpu_speed: 0,
             cpu_multiplier: 1,
 
-            flag_quirk_load_store,
-            flag_quirk_shift,
-            flag_quirk_draw,
-            flag_quirk_jump,
-            flag_quirk_vf_order,
             flag_vertical_wrapping: false,
             flag_mute: false,
             volume: 0.0,
+
+            quirks_settings,
 
             flag_about: false,
             flag_error: false,
@@ -303,26 +275,25 @@ impl GUI {
                     .build_with_ref(&ui, &mut self.flag_fullscreen);
                 ui.separator();
                 if let Some(menu) = ui.begin_menu(im_str!("Colors"), true) {
-                    if ColorEdit::new(im_str!("Background Color"), &mut self.color_bg).build(&ui) { self.flag_color_changed = true; }
-                    if ColorEdit::new(im_str!("Foreground Color"), &mut self.color_plane_1).build(&ui) { self.flag_color_changed = true; }
-                    if ColorEdit::new(im_str!("Foreground Color 2 (XO-CHIP)"), &mut self.color_plane_2).build(&ui) { self.flag_color_changed = true; }
-                    if ColorEdit::new(im_str!("Foreground Color 3 (XO-CHIP)"), &mut self.color_plane_both).build(&ui) { self.flag_color_changed = true; }
+                    if ColorEdit::new(im_str!("Background Color"), self.color_settings.get_mut(Color::Background)).build(&ui) { self.color_settings.changed = true; }
+                    if ColorEdit::new(im_str!("Foreground Color"), self.color_settings.get_mut(Color::Plane1)).build(&ui) { self.color_settings.changed = true; }
+                    if ColorEdit::new(im_str!("Foreground Color 2 (XO-CHIP)"), self.color_settings.get_mut(Color::Plane2)).build(&ui) { self.color_settings.changed = true; }
+                    if ColorEdit::new(im_str!("Foreground Color 3 (XO-CHIP)"), self.color_settings.get_mut(Color::PlaneBoth)).build(&ui) { self.color_settings.changed = true; }
 
                     ui.separator();
 
-                    let mut preset_handler = ColorPresetHandler::new(
-                        &mut self.color_bg,
-                        &mut self.color_plane_1,
-                        &mut self.color_plane_2,
-                        &mut self.color_plane_both,
-                    );
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("pich8 Default Preset"), ColorPreset::Default, &mut self.flag_color_changed);
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo Classic Preset"), ColorPreset::OctoClassic, &mut self.flag_color_changed);
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo LCD Preset"), ColorPreset::OctoLcd, &mut self.flag_color_changed);
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo Hotdog Preset"), ColorPreset::OctoHotdog, &mut self.flag_color_changed);
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo Gray Preset"), ColorPreset::OctoGray, &mut self.flag_color_changed);
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo CGA0 Preset"), ColorPreset::OctoCga0, &mut self.flag_color_changed);
-                    Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo CGA1 Preset"), ColorPreset::OctoCga1, &mut self.flag_color_changed);
+                    let mut preset_handler = ColorPresetHandler::new(&mut self.color_settings);
+                    let mut color_changed = false;
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("pich8 Default Preset"), ColorPreset::Default) { color_changed = true; }
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo Classic Preset"), ColorPreset::OctoClassic) { color_changed = true; }
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo LCD Preset"), ColorPreset::OctoLcd) { color_changed = true; }
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo Hotdog Preset"), ColorPreset::OctoHotdog) { color_changed = true; }
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo Gray Preset"), ColorPreset::OctoGray) { color_changed = true; }
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo CGA0 Preset"), ColorPreset::OctoCga0) { color_changed = true; }
+                    if Self::menu_item_color_preset(&ui, &mut preset_handler, im_str!("Octo CGA1 Preset"), ColorPreset::OctoCga1) { color_changed = true; }
+                    if color_changed {
+                        self.color_settings.changed = true;
+                    }
 
                     menu.end(&ui);
                 }
@@ -368,24 +339,18 @@ impl GUI {
                 }
                 if let Some(quirks_menu) = ui.begin_menu(im_str!("Quirks"), true) {
                     MenuItem::new(im_str!("Load/Store"))
-                        .build_with_ref(&ui, &mut self.flag_quirk_load_store);
+                        .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::LoadStore));
                     MenuItem::new(im_str!("Shift"))
-                        .build_with_ref(&ui, &mut self.flag_quirk_shift);
+                        .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Shift));
                     MenuItem::new(im_str!("Draw"))
-                        .build_with_ref(&ui, &mut self.flag_quirk_draw);
+                        .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Draw));
                     MenuItem::new(im_str!("Jump0"))
-                        .build_with_ref(&ui, &mut self.flag_quirk_jump);
+                        .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Jump));
                     MenuItem::new(im_str!("VF Order"))
-                        .build_with_ref(&ui, &mut self.flag_quirk_vf_order);
+                        .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::VfOrder));
                     ui.separator();
 
-                    let mut preset_handler = QuirksPresetHandler::new(
-                        &mut self.flag_quirk_load_store,
-                        &mut self.flag_quirk_shift,
-                        &mut self.flag_quirk_draw,
-                        &mut self.flag_quirk_jump,
-                        &mut self.flag_quirk_vf_order
-                    );
+                    let mut preset_handler = QuirksPresetHandler::new(&mut self.quirks_settings);
                     Self::menu_item_quirks_preset(&ui, &mut preset_handler, im_str!("Default Preset (Legacy ROMs)"), QuirksPreset::Default);
                     Self::menu_item_quirks_preset(&ui, &mut preset_handler, im_str!("Octo Preset"), QuirksPreset::Octo);
                     
@@ -810,13 +775,15 @@ impl GUI {
         if flag { *current_speed = item_speed; }
     }
 
-    fn menu_item_color_preset(ui: &Ui, preset_handler: &mut ColorPresetHandler, name: &ImStr, preset: ColorPreset, color_changed: &mut bool) {
+    fn menu_item_color_preset(ui: &Ui, preset_handler: &mut ColorPresetHandler, name: &ImStr, preset: ColorPreset) -> bool {
         let active = &mut preset_handler.is_active(preset);
         MenuItem::new(name)
             .build_with_ref(&ui, active);
         if *active {
             preset_handler.set_preset(preset);
-            *color_changed = true;
+            true
+        } else {
+            false
         }
     }
 
