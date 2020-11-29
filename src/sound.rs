@@ -7,7 +7,6 @@ use rodio::{
     Sink,
     buffer::SamplesBuffer,
 };
-use bitvec::{vec::BitVec, order::Msb0};
 
 pub enum Command {
     PlayBeep,
@@ -41,11 +40,16 @@ impl AudioPlayer {
                                 Command::PlayBeep => queue.append(SineWave::new(Self::BEEP_FREQ).take_duration(beep_duration)),
                                 Command::PlayBuffer(buf) => {
                                     let reps = sample_rate / Self::BUF_FREQ;
-                                    let samples: Vec<f32> = BitVec::<Msb0, _>::from_vec(buf.to_vec())
-                                        .into_iter()
-                                        .map(|v| vec![if v { Self::VOLUME } else { 0.0 }; reps as usize])
-                                        .flatten()
-                                        .collect();
+                                    let mut samples = Vec::with_capacity(buf.len() * 8 * reps as usize);
+                                    for idx_byte in 0..buf.len() {
+                                        for idx_bit in 0..8 {
+                                            let bit = buf[idx_byte] >> (7 - idx_bit) & 0b1 == 0b1;
+                                            let val = if bit { Self::VOLUME } else { 0.0 };
+                                            for _ in 0..reps {
+                                                samples.push(val);
+                                            }
+                                        }
+                                    }
                                     let sample_buffer = SamplesBuffer::new(1, sample_rate, samples);
                                     queue.append(sample_buffer.take_duration(Duration::from_secs_f32(1.0 / 60.0)));
                                 },

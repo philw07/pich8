@@ -6,7 +6,7 @@ fn test_initial_state() {
 
     assert_eq!(cpu.mem.len(), 65536);
     assert_eq!(cpu.stack, [0; 16]);
-    assert_eq!(cpu.keys, bitarr![Msb0, u16; 0; 16]);
+    assert_eq!(cpu.keys, [false; 16]);
 
     assert_eq!(cpu.V, [0; 16]);
     assert_eq!(cpu.I, 0);
@@ -293,7 +293,7 @@ fn test_opcodes() {
     {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0xE0, 0x9E]);
-        cpu.keys.set(3, true);
+        cpu.keys[3] = true;
         cpu.V[0] = 3;
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.PC, 0x204);
@@ -302,7 +302,7 @@ fn test_opcodes() {
     {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0xE0, 0x9E]);
-        cpu.keys.set(3, false);
+        cpu.keys[3] = false;
         cpu.V[0] = 3;
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.PC, 0x202);
@@ -312,7 +312,7 @@ fn test_opcodes() {
     {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0xE0, 0xA1]);
-        cpu.keys.set(3, true);
+        cpu.keys[3] = true;
         cpu.V[0] = 3;
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.PC, 0x202);
@@ -321,7 +321,7 @@ fn test_opcodes() {
     {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0xE0, 0xA1]);
-        cpu.keys.set(3, false);
+        cpu.keys[3] = false;
         cpu.V[0] = 3;
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.PC, 0x204);

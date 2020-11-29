@@ -1,4 +1,3 @@
-use bitvec::{bitarr, array::BitArray, order::Msb0};
 use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -18,8 +17,8 @@ pub enum Plane {
 
 #[derive(Serialize, Deserialize)]
 pub struct VideoMemory {
-    vmem1: [BitArray<Msb0, [u64; 32]>; 4],
-    vmem2: [BitArray<Msb0, [u64; 32]>; 4],
+    vmem1: Box<[bool]>,
+    vmem2: Box<[bool]>,
     pub video_mode: VideoMode,
     plane: Plane,
 }
@@ -31,22 +30,11 @@ impl VideoMemory {
     const HEIGHT_HIRES: usize = 64;
     const WIDTH_EXTENDED: usize = 128;
     const HEIGHT_EXTENDED: usize = 64;
-    const BUF_LEN: usize = Self::WIDTH_DEFAULT * Self::HEIGHT_DEFAULT;
 
     pub fn new() -> Self {
         Self {
-            vmem1: [
-                bitarr![Msb0, u64; 0; 64*32],
-                bitarr![Msb0, u64; 0; 64*32],
-                bitarr![Msb0, u64; 0; 64*32],
-                bitarr![Msb0, u64; 0; 64*32]
-            ],
-            vmem2: [
-                bitarr![Msb0, u64; 0; 64*32],
-                bitarr![Msb0, u64; 0; 64*32],
-                bitarr![Msb0, u64; 0; 64*32],
-                bitarr![Msb0, u64; 0; 64*32]
-            ],
+            vmem1: vec![false; 128*64].into_boxed_slice(),
+            vmem2: vec![false; 128*64].into_boxed_slice(),
             video_mode: VideoMode::Default,
             plane: Plane::First,
         }
@@ -80,11 +68,11 @@ impl VideoMemory {
         }
         match plane {
             Plane::None => (),
-            Plane::First => self.vmem1[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value),
-            Plane::Second => self.vmem2[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value),
+            Plane::First => self.vmem1[index] = value,
+            Plane::Second => self.vmem2[index] = value,
             Plane::Both => {
-                self.vmem1[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value);
-                self.vmem2[index / Self::BUF_LEN].set(index % Self::BUF_LEN, value);
+                self.vmem1[index] = value;
+                self.vmem2[index] = value;
             },
         }
     }
@@ -96,9 +84,9 @@ impl VideoMemory {
     pub fn set_all(&mut self, value: bool) {
         match self.plane {
             Plane::None => (),
-            Plane::First => for i in 0..self.vmem1.len() { self.vmem1[i].set_all(value); },
-            Plane::Second => for i in 0..self.vmem2.len() { self.vmem2[i].set_all(value); },
-            Plane::Both => for i in 0..self.vmem1.len() { self.vmem1[i].set_all(value); self.vmem2[i].set_all(value); },
+            Plane::First => self.vmem1.iter_mut().for_each(|x| *x = value),
+            Plane::Second => self.vmem2.iter_mut().for_each(|x| *x = value),
+            Plane::Both => { self.vmem1.iter_mut().for_each(|x| *x = value); self.vmem2.iter_mut().for_each(|x| *x = value); },
         }
     }
 
@@ -146,8 +134,8 @@ impl VideoMemory {
         }
         match plane {
             Plane::None     => false,
-            Plane::First    => self.vmem1[index / Self::BUF_LEN][index % Self::BUF_LEN],
-            Plane::Second   => self.vmem2[index / Self::BUF_LEN][index % Self::BUF_LEN],
+            Plane::First    => self.vmem1[index],
+            Plane::Second   => self.vmem2[index],
             Plane::Both     => panic!("shouldn't call get with both planes selected!"),
         }
     }

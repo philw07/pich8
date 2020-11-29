@@ -1,6 +1,5 @@
 use std::fmt;
 use rand::prelude::*;
-use bitvec::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::video_memory::{VideoMemory, VideoMode, Plane};
 
@@ -48,7 +47,7 @@ pub struct CPU {
     mem: Box<[u8]>,                         // Main memory
     vmem: VideoMemory,                      // Graphics memory
     stack: [u16; 16],                       // Stack to store locations before a jump occurs
-    keys: BitArray<Msb0, [u16; 1]>,         // Keypad status
+    keys: [bool; 16],                       // Keypad status
     audio_buffer: Option<[u8; 16]>,         // XO-CHIP audio buffer
 
     PC: u16,                                // Program counter
@@ -120,7 +119,7 @@ impl CPU {
             mem: vec![0; u16::MAX as usize + 1].into_boxed_slice(),
             vmem: VideoMemory::new(),
             stack: [0; 16],
-            keys: bitarr![Msb0, u16; 0; 16],
+            keys: [false; 16],
             audio_buffer: None,
 
             PC: CPU::PC_INITIAL,
@@ -203,8 +202,8 @@ impl CPU {
         }
     }
 
-    pub fn tick(&mut self, keys: &BitArray<Msb0, [u16; 1]>) -> Result<(), Error> {
-        self.keys.copy_from_bitslice(keys);
+    pub fn tick(&mut self, keys: &[bool; 16]) -> Result<(), Error> {
+        self.keys.copy_from_slice(keys);
         if self.key_wait {
             for i in 0..keys.len() {
                 if keys[i] {
