@@ -14,9 +14,7 @@ pub struct QuirksSettings {
 
 impl QuirksSettings {
     pub fn new() -> Self {
-        Self {
-            quirks: [false; 5],
-        }
+        Self { quirks: [false; 5] }
     }
 
     pub fn get(&self, quirk: Quirk) -> bool {

@@ -20,14 +20,16 @@ impl RomDownloader {
         }
     }
 
-    pub fn is_active(&self) -> bool { self.is_active }
+    pub fn is_active(&self) -> bool {
+        self.is_active
+    }
 
     pub fn download(&mut self, url: Url) {
         self.is_active = true;
 
         let (tx, rx) = std::sync::mpsc::channel();
         self.chan_rx = Some(rx);
-        
+
         std::thread::spawn(move || {
             let result = match reqwest::blocking::get(url) {
                 Ok(resp) => {
@@ -39,7 +41,7 @@ impl RomDownloader {
                     } else {
                         DownloadResult::Fail("Download failed!".to_string())
                     }
-                },
+                }
                 Err(e) => DownloadResult::Fail(format!("Download failed: {}", e)),
             };
 

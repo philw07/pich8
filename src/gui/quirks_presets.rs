@@ -15,9 +15,7 @@ impl<'a> QuirksPresetHandler<'a> {
     const QUIRKS_PRESET_OCTO: [bool; 5] = [false, false, true, false, true];
 
     pub fn new(settings: &'a mut QuirksSettings) -> Self {
-        Self {
-            settings,
-        }
+        Self { settings }
     }
 
     pub fn is_active(&self, preset: QuirksPreset) -> bool {

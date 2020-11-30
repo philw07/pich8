@@ -16,12 +16,7 @@ pub struct ColorPresetHandler<'a> {
 }
 
 impl<'a> ColorPresetHandler<'a> {
-    const COLOR_PRESET_DEFAULT: [[f32; 3]; 4] = [
-        [0.0; 3],
-        [1.0; 3],
-        [0.333; 3],
-        [0.667; 3],
-    ];
+    const COLOR_PRESET_DEFAULT: [[f32; 3]; 4] = [[0.0; 3], [1.0; 3], [0.333; 3], [0.667; 3]];
     const COLOR_PRESET_OCTO_CLASSIC: [[f32; 3]; 4] = [
         [0.6, 0.4, 0.0],
         [1.0, 0.8, 0.0],
@@ -60,15 +55,15 @@ impl<'a> ColorPresetHandler<'a> {
     ];
 
     pub fn new(settings: &'a mut ColorSettings) -> Self {
-        Self {
-            settings,
-        }
+        Self { settings }
     }
 
     pub fn is_active(&self, preset: ColorPreset) -> bool {
         for (v1, v2) in self.settings.iter().zip(self.get_preset(preset).iter()) {
-            if v1 != v2 {
-                return false;
+            for (f1, f2) in v1.iter().zip(v2.iter()) {
+                if (f1 - f2).abs() > f32::EPSILON {
+                    return false;
+                }
             }
         }
 

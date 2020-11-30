@@ -3,7 +3,7 @@ use std::sync::mpsc::Receiver;
 pub enum FileDialogType {
     OpenRom,
     SaveState,
-    
+
     #[cfg(feature = "rom-download")]
     InputUrl,
 }
@@ -36,7 +36,9 @@ impl DialogHandler {
         }
     }
 
-    pub fn is_open(&self) -> bool { self.is_open }
+    pub fn is_open(&self) -> bool {
+        self.is_open
+    }
 
     pub fn open_file_dialog(&mut self, dialog_type: FileDialogType) {
         self.is_open = true;
@@ -54,14 +56,14 @@ impl DialogHandler {
                 },
                 FileDialogType::SaveState => {
                     if let Some(file_path) = tinyfiledialogs::save_file_dialog_with_filter("Save State", "", DialogHandler::STATE_FILTER_PATT, DialogHandler::STATE_FILTER_DESC) {
-                        result = FileDialogResult::SaveState(if file_path.contains(".") { file_path } else { format!("{}.p8s", file_path) });
+                        result = FileDialogResult::SaveState(if file_path.contains('.') { file_path } else { format!("{}.p8s", file_path) });
                     }
                 },
-                
+
                 #[cfg(feature = "rom-download")]
                 FileDialogType::InputUrl => {
                     if let Some(url) = tinyfiledialogs::input_box("Input ROM URL", "Please input the URL pointing to the ROM file.\nFor Github, please make sure to use the raw file link!", "") {
-                        if url.len() > 0 {
+                        if !url.is_empty() {
                             result = FileDialogResult::InputUrl(url);
                         }
                     }

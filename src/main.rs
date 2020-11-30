@@ -1,20 +1,20 @@
 #![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
 mod cpu;
+mod dialog_handler;
 mod display;
+mod emulator;
+mod fps_counter;
 mod gui;
 mod sound;
-mod emulator;
-mod dialog_handler;
-mod fps_counter;
 mod video_memory;
 
 #[cfg(feature = "rom-download")]
 mod rom_downloader;
 
-use std::env;
-use getopts::Options;
 use emulator::Emulator;
+use getopts::Options;
+use std::env;
 
 const OPT_VSYNC: &str = "vsync";
 

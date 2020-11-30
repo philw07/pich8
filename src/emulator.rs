@@ -1,30 +1,18 @@
-use crate::cpu::{CPU, Breakpoint};
-use crate::display::WindowDisplay;
-use crate::gui::GUI;
-use crate::sound::AudioPlayer;
+use crate::cpu::{Breakpoint, CPU};
 use crate::dialog_handler::{DialogHandler, FileDialogResult, FileDialogType};
+use crate::display::WindowDisplay;
 use crate::fps_counter::FpsCounter;
-use crate::gui::{Quirk, Color};
-use std::{time::Instant, fs};
-use glium::{
-    glutin::{
-        event_loop::{
-            EventLoop,
-            ControlFlow,
-        },
-        event::{
-            Event,
-            WindowEvent,
-            KeyboardInput,
-            VirtualKeyCode,
-            ElementState,
-            ModifiersState,
-        },
-    },
+use crate::gui::GUI;
+use crate::gui::{Color, Quirk};
+use crate::sound::AudioPlayer;
+use glium::glutin::{
+    event::{ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
 };
+use std::{fs, time::Instant};
 
 #[cfg(feature = "rom-download")]
-use crate::rom_downloader::{RomDownloader, DownloadResult};
+use crate::rom_downloader::{DownloadResult, RomDownloader};
 
 enum LoadedType {
     Nothing,
@@ -78,7 +66,7 @@ impl Emulator {
         gui.volume = 0.25;
 
         let now = Instant::now();
-        Ok(Self{
+        Ok(Self {
             cpu,
             cpu_speed,
             display,
@@ -111,17 +99,21 @@ impl Emulator {
             LoadedType::Rom(rom) => {
                 self.cpu = CPU::new();
                 match self.cpu.load_rom(&rom) {
-                    Ok(_) => if !self.gui.flag_debug { self.gui.flag_pause = false; },
+                    Ok(_) => {
+                        if !self.gui.flag_debug {
+                            self.gui.flag_pause = false;
+                        }
+                    }
                     Err(_) => self.gui.display_error("Data is not a valid ROM!"),
                 }
-            },
+            }
             LoadedType::State(state) => {
                 match CPU::from_state(&state) {
                     Ok(cpu) => self.cpu = cpu,
                     Err(msg) => self.gui.display_error(&msg),
                 }
                 self.gui.flag_pause = false;
-            },
+            }
             _ => (),
         }
     }
@@ -155,11 +147,11 @@ impl Emulator {
                 DownloadResult::Success(data) => {
                     self.gui.flag_downloading = false;
                     self.load_rom(&data);
-                },
+                }
                 DownloadResult::Fail(msg) => {
                     self.gui.flag_downloading = false;
                     self.gui.display_error(&msg);
-                },
+                }
                 DownloadResult::None => (),
             }
         }
@@ -176,31 +168,29 @@ impl Emulator {
                                 match fs::read(&file_path) {
                                     Ok(file) => {
                                         // Check if it's a p8s state file, otherwise expect ROM
-                                        if &file[0..3] == "p8s".as_bytes() {
+                                        if &file[0..3] == b"p8s" {
                                             self.load_state(&file[3..]);
                                         } else {
                                             self.load_rom(&file);
                                         }
-                                    },
+                                    }
                                     Err(err) => self.gui.display_error(&format!("Error: {}", err)),
                                 }
                             } else {
                                 self.gui.display_error("File is too big!");
                             }
-                        },
+                        }
                         Err(err) => self.gui.display_error(&format!("Error: {}", err)),
                     }
-                },
-                FileDialogResult::SaveState(file_path) => {
-                    match self.cpu.save_state().as_mut() {
-                        Ok(state) => {
-                            state.splice(0..0, "p8s".as_bytes().iter().cloned());
-                            if fs::write(file_path, state).is_err() {
-                                self.gui.display_error("Failed to write to file!");
-                            }
-                        },
-                        Err(msg) => self.gui.display_error(&msg),
+                }
+                FileDialogResult::SaveState(file_path) => match self.cpu.save_state().as_mut() {
+                    Ok(state) => {
+                        state.splice(0..0, b"p8s".iter().cloned());
+                        if fs::write(file_path, state).is_err() {
+                            self.gui.display_error("Failed to write to file!");
+                        }
                     }
+                    Err(msg) => self.gui.display_error(&msg),
                 },
 
                 #[cfg(feature = "rom-download")]
@@ -208,7 +198,7 @@ impl Emulator {
                     self.gui.flag_downloading = true;
                     match url::Url::parse(&url) {
                         Ok(url) => self.rom_downloader.download(url),
-                        Err(e) => self.gui.display_error(&format!("Invalid URL: {}", e)),    
+                        Err(e) => self.gui.display_error(&format!("Invalid URL: {}", e)),
                     }
                 }
 
@@ -226,13 +216,15 @@ impl Emulator {
             match event {
                 Event::NewEvents(_) => {
                     self.handle_gui_flags(ctrl_flow);
-                },
+                }
                 Event::MainEventsCleared => {
                     if !self.pause {
-                        // Perform 
+                        // Perform
                         let nanos_per_cycle = 1_000_000_000 / self.cpu_speed as u64;
                         if self.last_cycle.elapsed().as_nanos() as u64 >= nanos_per_cycle * 10 {
-                            let cycles = (self.last_cycle.elapsed().as_nanos() as f64 / nanos_per_cycle as f64) as u64;
+                            let cycles = (self.last_cycle.elapsed().as_nanos() as f64
+                                / nanos_per_cycle as f64)
+                                as u64;
                             self.last_cycle = Instant::now();
                             for _ in 0..cycles {
                                 if let Err(e) = self.cpu.tick(&self.input) {
@@ -246,7 +238,8 @@ impl Emulator {
                             }
                         }
                         // Update CPU timers
-                        if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::NANOS_PER_TIMER {
+                        if self.last_timer.elapsed().as_nanos() as u64 >= Emulator::NANOS_PER_TIMER
+                        {
                             self.last_timer = Instant::now();
                             let mut reps = 1;
                             let mut reset_counter = false;
@@ -287,24 +280,53 @@ impl Emulator {
 
                     // Always request redrawing to keep the GUI updated
                     self.display.display().gl_window().window().request_redraw();
-                },
+                }
                 Event::RedrawRequested(_) => {
                     let fps = self.fps_counter.tick();
                     let frame_duration = Instant::now() - self.frame_time;
                     self.frame_time = Instant::now();
 
                     let is_fullscreen = self.display.fullscreen();
-                    let height = if is_fullscreen { 0 } else { self.gui.menu_height() };
-                    let vmem = if self.force_redraw || self.cpu.draw { self.cpu.draw = false; Some(self.cpu.vmem()) } else { None };
-                    let mut frame = self.display.prepare(vmem, height).expect("Failed to prepare frame");
+                    let height = if is_fullscreen {
+                        0
+                    } else {
+                        self.gui.menu_height()
+                    };
+                    let vmem = if self.force_redraw || self.cpu.draw {
+                        self.cpu.draw = false;
+                        Some(self.cpu.vmem())
+                    } else {
+                        None
+                    };
+                    let mut frame = self
+                        .display
+                        .prepare(vmem, height)
+                        .expect("Failed to prepare frame");
                     if !is_fullscreen {
-                        self.gui.render(frame_duration, self.display.display(), &mut frame, fps, &self.cpu).expect("Failed to render GUI");
+                        self.gui
+                            .render(
+                                frame_duration,
+                                self.display.display(),
+                                &mut frame,
+                                fps,
+                                &self.cpu,
+                            )
+                            .expect("Failed to render GUI");
                     }
                     self.display.render(frame).expect("Failed to render frame");
-                },
-                Event::WindowEvent{ event: WindowEvent::KeyboardInput { input, .. }, .. } => self.handle_input(input, ctrl_flow),
-                Event::WindowEvent{ event: WindowEvent::CloseRequested, .. } => *ctrl_flow = ControlFlow::Exit,
-                Event::WindowEvent{ event: WindowEvent::ModifiersChanged(modifiers_state), .. } => self.modifiers_state = modifiers_state,
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::KeyboardInput { input, .. },
+                    ..
+                } => self.handle_input(input, ctrl_flow),
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => *ctrl_flow = ControlFlow::Exit,
+                Event::WindowEvent {
+                    event: WindowEvent::ModifiersChanged(modifiers_state),
+                    ..
+                } => self.modifiers_state = modifiers_state,
                 _ => (),
             }
         }
@@ -321,18 +343,21 @@ impl Emulator {
         }
 
         if self.gui.flag_open {
-            self.dialog_handler.open_file_dialog(FileDialogType::OpenRom);
+            self.dialog_handler
+                .open_file_dialog(FileDialogType::OpenRom);
             self.gui.flag_open = false;
         }
 
         #[cfg(feature = "rom-download")]
         if self.gui.flag_open_rom_url {
-            self.dialog_handler.open_file_dialog(FileDialogType::InputUrl);
+            self.dialog_handler
+                .open_file_dialog(FileDialogType::InputUrl);
             self.gui.flag_open_rom_url = false;
         }
 
         if self.gui.flag_save_state {
-            self.dialog_handler.open_file_dialog(FileDialogType::SaveState);
+            self.dialog_handler
+                .open_file_dialog(FileDialogType::SaveState);
             self.gui.flag_save_state = false;
         }
         if self.gui.flag_reset {
@@ -359,25 +384,25 @@ impl Emulator {
             self.display.color_bg = [
                 (color_bg[0] * 255.0) as u8,
                 (color_bg[1] * 255.0) as u8,
-                (color_bg[2] * 255.0) as u8
+                (color_bg[2] * 255.0) as u8,
             ];
-            let color_p1 = color_settings.get(Color::Plane1);
+            let color_plane_1 = color_settings.get(Color::Plane1);
             self.display.color_plane_1 = [
-                (color_p1[0] * 255.0) as u8,
-                (color_p1[1] * 255.0) as u8,
-                (color_p1[2] * 255.0) as u8
+                (color_plane_1[0] * 255.0) as u8,
+                (color_plane_1[1] * 255.0) as u8,
+                (color_plane_1[2] * 255.0) as u8,
             ];
-            let color_p2 = color_settings.get(Color::Plane2);
+            let color_plane_2 = color_settings.get(Color::Plane2);
             self.display.color_plane_2 = [
-                (color_p2[0] * 255.0) as u8,
-                (color_p2[1] * 255.0) as u8,
-                (color_p2[2] * 255.0) as u8
+                (color_plane_2[0] * 255.0) as u8,
+                (color_plane_2[1] * 255.0) as u8,
+                (color_plane_2[2] * 255.0) as u8,
             ];
-            let color_pb = color_settings.get(Color::PlaneBoth);
+            let color_plane_both = color_settings.get(Color::PlaneBoth);
             self.display.color_plane_both = [
-                (color_pb[0] * 255.0) as u8,
-                (color_pb[1] * 255.0) as u8,
-                (color_pb[2] * 255.0) as u8
+                (color_plane_both[0] * 255.0) as u8,
+                (color_plane_both[1] * 255.0) as u8,
+                (color_plane_both[2] * 255.0) as u8,
             ];
         }
 
@@ -392,7 +417,7 @@ impl Emulator {
         self.cpu.quirk_draw = quirks.get(Quirk::Draw);
         self.cpu.quirk_jump = quirks.get(Quirk::Jump);
         self.cpu.quirk_vf_order = quirks.get(Quirk::VfOrder);
-        
+
         self.step = self.gui.flag_step;
         self.gui.flag_step = false;
         self.step_timers = self.gui.flag_step_timers;
@@ -421,18 +446,29 @@ impl Emulator {
                 }
             }
         }
-        if self.gui.flag_breakpoint_opcode() {
-            if self.cpu.check_breakpoint(Breakpoint::Opcode(self.gui.breakpoint_opcode().to_string())) {
-                return true;
-            }
+        if self.gui.flag_breakpoint_opcode()
+            && self
+                .cpu
+                .check_breakpoint(Breakpoint::Opcode(self.gui.breakpoint_opcode().to_string()))
+        {
+            return true;
         }
         false
     }
 
     #[inline]
-    fn handle_input(&mut self, KeyboardInput { scancode, virtual_keycode, state, .. }: KeyboardInput, ctrl_flow: &mut ControlFlow) {
-        use VirtualKeyCode::*;
+    fn handle_input(
+        &mut self,
+        KeyboardInput {
+            scancode,
+            virtual_keycode,
+            state,
+            ..
+        }: KeyboardInput,
+        ctrl_flow: &mut ControlFlow,
+    ) {
         use ElementState::*;
+        use VirtualKeyCode::*;
         const SCANCODE_1: u32 = 2;
         const SCANCODE_2: u32 = 3;
         const SCANCODE_3: u32 = 4;
@@ -456,7 +492,9 @@ impl Emulator {
             match (scancode, keycode, state, ctrl, shift) {
                 // Command keys
                 #[cfg(feature = "rom-download")]
-                (_, O, Pressed, true, true) => { self.gui.flag_open_rom_url = true; },
+                (_, O, Pressed, true, true) => {
+                    self.gui.flag_open_rom_url = true;
+                }
 
                 (_, Escape, Pressed, _, _) => {
                     if self.gui.flag_fullscreen {
@@ -464,51 +502,71 @@ impl Emulator {
                     } else {
                         *ctrl_flow = ControlFlow::Exit;
                     }
-                },
-                (_, F1, Pressed, _, _) => { self.gui.flag_display_fps = !self.gui.flag_display_fps; },
-                (_, F5, Pressed, _, _) => { self.gui.flag_reset = true; },
-                (_, F7, Pressed, _, _) => { self.gui.flag_debug = !self.gui.flag_debug; },
-                (_, F8, Pressed, _, _) => { self.gui.flag_step = true; },
-                (_, F9, Pressed, _, _) => { self.gui.flag_step_timers = true; },
-                (_, F11, Pressed, _, _) => { self.gui.flag_fullscreen = !self.gui.flag_fullscreen; },
-                (_, P, Pressed, _, _) => { self.gui.flag_pause = !self.gui.flag_pause; },
-                (_, M, Pressed, _, _) => { self.gui.flag_mute = !self.gui.flag_mute; },
-                (_, O, Pressed, true, _) => { self.gui.flag_open = true; },
-                (_, S, Pressed, true, _) => { self.gui.flag_save_state = true; },
+                }
+                (_, F1, Pressed, _, _) => {
+                    self.gui.flag_display_fps = !self.gui.flag_display_fps;
+                }
+                (_, F5, Pressed, _, _) => {
+                    self.gui.flag_reset = true;
+                }
+                (_, F7, Pressed, _, _) => {
+                    self.gui.flag_debug = !self.gui.flag_debug;
+                }
+                (_, F8, Pressed, _, _) => {
+                    self.gui.flag_step = true;
+                }
+                (_, F9, Pressed, _, _) => {
+                    self.gui.flag_step_timers = true;
+                }
+                (_, F11, Pressed, _, _) => {
+                    self.gui.flag_fullscreen = !self.gui.flag_fullscreen;
+                }
+                (_, P, Pressed, _, _) => {
+                    self.gui.flag_pause = !self.gui.flag_pause;
+                }
+                (_, M, Pressed, _, _) => {
+                    self.gui.flag_mute = !self.gui.flag_mute;
+                }
+                (_, O, Pressed, true, _) => {
+                    self.gui.flag_open = true;
+                }
+                (_, S, Pressed, true, _) => {
+                    self.gui.flag_save_state = true;
+                }
 
                 // Chip8 keys - using scancode instead of VirtualKeyCode to account for different keyboard layouts
-                (SCANCODE_1, _, Pressed, _, _)     => self.input[1] = true,
-                (SCANCODE_1, _, Released, _, _)    => self.input[1] = false,
-                (SCANCODE_2, _, Pressed, _, _)     => self.input[2] = true,
-                (SCANCODE_2, _, Released, _, _)    => self.input[2] = false,
-                (SCANCODE_3, _, Pressed, _, _)     => self.input[3] = true,
-                (SCANCODE_3, _, Released, _, _)    => self.input[3] = false,
-                (SCANCODE_4, _, Pressed, _, _)     => self.input[0xC] = true,
-                (SCANCODE_4, _, Released, _, _)    => self.input[0xC] = false,
-                (SCANCODE_Q, _, Pressed, _, _)    => self.input[4] = true,
-                (SCANCODE_Q, _, Released, _, _)   => self.input[4] = false,
-                (SCANCODE_W, _, Pressed, _, _)    => self.input[5] = true,
-                (SCANCODE_W, _, Released, _, _)   => self.input[5] = false,
-                (SCANCODE_E, _, Pressed, _, _)    => self.input[6] = true,
-                (SCANCODE_E, _, Released, _, _)   => self.input[6] = false,
-                (SCANCODE_R, _, Pressed, _, _)    => self.input[0xD] = true,
-                (SCANCODE_R, _, Released, _, _)   => self.input[0xD] = false,
-                (SCANCODE_A, _, Pressed, _, _)    => self.input[7] = true,
-                (SCANCODE_A, _, Released, _, _)   => self.input[7] = false,
-                (SCANCODE_S, _, Pressed, _, _)    => self.input[8] = true,
-                (SCANCODE_S, _, Released, _, _)   => self.input[8] = false,
-                (SCANCODE_D, _, Pressed, _, _)    => self.input[9] = true,
-                (SCANCODE_D, _, Released, _, _)   => self.input[9] = false,
-                (SCANCODE_F, _, Pressed, _, _)    => self.input[0xE] = true,
-                (SCANCODE_F, _, Released, _, _)   => self.input[0xE] = false,
-                (SCANCODE_Z, _, Pressed, _, _)    => self.input[0xA] = true,
-                (SCANCODE_Z, _, Released, _, _)   => self.input[0xA] = false,
-                (SCANCODE_X, _, Pressed, _, _)    => self.input[0] = true,
-                (SCANCODE_X, _, Released, _, _)   => self.input[0] = false,
-                (SCANCODE_C, _, Pressed, _, _)    => self.input[0xB] = true,
-                (SCANCODE_C, _, Released, _, _)   => self.input[0xB] = false,
-                (SCANCODE_V, _, Pressed, _, _)    => self.input[0xF] = true,
-                (SCANCODE_V, _, Released, _, _)   => self.input[0xF] = false,
+                (SCANCODE_1, _, Pressed, _, _) => self.input[1] = true,
+                (SCANCODE_1, _, Released, _, _) => self.input[1] = false,
+                (SCANCODE_2, _, Pressed, _, _) => self.input[2] = true,
+                (SCANCODE_2, _, Released, _, _) => self.input[2] = false,
+                (SCANCODE_3, _, Pressed, _, _) => self.input[3] = true,
+                (SCANCODE_3, _, Released, _, _) => self.input[3] = false,
+                (SCANCODE_4, _, Pressed, _, _) => self.input[0xC] = true,
+                (SCANCODE_4, _, Released, _, _) => self.input[0xC] = false,
+                (SCANCODE_Q, _, Pressed, _, _) => self.input[4] = true,
+                (SCANCODE_Q, _, Released, _, _) => self.input[4] = false,
+                (SCANCODE_W, _, Pressed, _, _) => self.input[5] = true,
+                (SCANCODE_W, _, Released, _, _) => self.input[5] = false,
+                (SCANCODE_E, _, Pressed, _, _) => self.input[6] = true,
+                (SCANCODE_E, _, Released, _, _) => self.input[6] = false,
+                (SCANCODE_R, _, Pressed, _, _) => self.input[0xD] = true,
+                (SCANCODE_R, _, Released, _, _) => self.input[0xD] = false,
+                (SCANCODE_A, _, Pressed, _, _) => self.input[7] = true,
+                (SCANCODE_A, _, Released, _, _) => self.input[7] = false,
+                (SCANCODE_S, _, Pressed, _, _) => self.input[8] = true,
+                (SCANCODE_S, _, Released, _, _) => self.input[8] = false,
+                (SCANCODE_D, _, Pressed, _, _) => self.input[9] = true,
+                (SCANCODE_D, _, Released, _, _) => self.input[9] = false,
+                (SCANCODE_F, _, Pressed, _, _) => self.input[0xE] = true,
+                (SCANCODE_F, _, Released, _, _) => self.input[0xE] = false,
+                (SCANCODE_Z, _, Pressed, _, _) => self.input[0xA] = true,
+                (SCANCODE_Z, _, Released, _, _) => self.input[0xA] = false,
+                (SCANCODE_X, _, Pressed, _, _) => self.input[0] = true,
+                (SCANCODE_X, _, Released, _, _) => self.input[0] = false,
+                (SCANCODE_C, _, Pressed, _, _) => self.input[0xB] = true,
+                (SCANCODE_C, _, Released, _, _) => self.input[0xB] = false,
+                (SCANCODE_V, _, Pressed, _, _) => self.input[0xF] = true,
+                (SCANCODE_V, _, Released, _, _) => self.input[0xF] = false,
 
                 _ => (),
             }

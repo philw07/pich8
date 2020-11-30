@@ -125,21 +125,27 @@ impl CPU {
     // 0x3XNN - Skip next instruction if Vx == nn
     #[inline]
     pub(super) fn opcode_0x3XNN(&mut self, x: usize, nn: u8) {
-        if self.V[x] == nn { self.skip_next_instruction(); }
+        if self.V[x] == nn {
+            self.skip_next_instruction();
+        }
         self.PC += 2;
     }
 
     // 0x4XNN - Skip next instruction if Vx != nn
     #[inline]
     pub(super) fn opcode_0x4XNN(&mut self, x: usize, nn: u8) {
-        if self.V[x] != nn { self.skip_next_instruction(); }
+        if self.V[x] != nn {
+            self.skip_next_instruction();
+        }
         self.PC += 2;
     }
 
     // 0x5XY0 - Skip next instruction if Vx == Vy
     #[inline]
     pub(super) fn opcode_0x5XY0(&mut self, x: usize, y: usize) {
-        if self.V[x] == self.V[y] { self.skip_next_instruction(); }
+        if self.V[x] == self.V[y] {
+            self.skip_next_instruction();
+        }
         self.PC += 2;
     }
 
@@ -148,7 +154,8 @@ impl CPU {
     pub(super) fn opcode_xochip_0x5XY2(&mut self, x: usize, y: usize) {
         let first = std::cmp::min(x, y);
         let last = std::cmp::max(x, y);
-        self.mem[self.I as usize..self.I as usize + last - first + 1].copy_from_slice(&self.V[first..=last]);
+        self.mem[self.I as usize..self.I as usize + last - first + 1]
+            .copy_from_slice(&self.V[first..=last]);
         self.PC += 2;
     }
 
@@ -157,7 +164,8 @@ impl CPU {
     pub(super) fn opcode_xochip_0x5XY3(&mut self, x: usize, y: usize) {
         let first = std::cmp::min(x, y);
         let last = std::cmp::max(x, y);
-        self.V[first..=last].copy_from_slice(&self.mem[self.I as usize..self.I as usize + last - first + 1]);
+        self.V[first..=last]
+            .copy_from_slice(&self.mem[self.I as usize..self.I as usize + last - first + 1]);
         self.PC += 2;
     }
 
@@ -260,7 +268,9 @@ impl CPU {
     // 0x9XY0 - Skip next instruction if Vx != Vy
     #[inline]
     pub(super) fn opcode_0x9XY0(&mut self, x: usize, y: usize) {
-        if self.V[x] != self.V[y] { self.skip_next_instruction(); }
+        if self.V[x] != self.V[y] {
+            self.skip_next_instruction();
+        }
         self.PC += 2;
     }
 
@@ -276,7 +286,12 @@ impl CPU {
     // Quirk:    PC = xnn + Vx
     #[inline]
     pub(super) fn opcode_0xBNNN(&mut self, nnn: u16) {
-        self.PC = nnn + if self.quirk_jump { self.V[(nnn >> 8 & 0xF) as usize] } else { self.V[0] } as u16;
+        self.PC = nnn
+            + if self.quirk_jump {
+                self.V[(nnn >> 8 & 0xF) as usize]
+            } else {
+                self.V[0]
+            } as u16;
     }
 
     // 0xCXNN - Vx = rand() & nn
@@ -298,21 +313,25 @@ impl CPU {
     // 0xEX9E - Skip next instruction if key(Vx) is pressed
     #[inline]
     pub(super) fn opcode_0xEX9E(&mut self, x: usize) {
-        if self.keys[self.V[x] as usize] { self.skip_next_instruction(); }
+        if self.keys[self.V[x] as usize] {
+            self.skip_next_instruction();
+        }
         self.PC += 2;
     }
 
     // 0xEXA1 - Skip next instruction if key(Vx) is not pressed
     #[inline]
     pub(super) fn opcode_0xEXA1(&mut self, x: usize) {
-        if !self.keys[self.V[x] as usize] { self.skip_next_instruction(); }
+        if !self.keys[self.V[x] as usize] {
+            self.skip_next_instruction();
+        }
         self.PC += 2;
     }
 
     // 0xF000 NNNN - XO-CHIP - I = NNNN
     #[inline]
     pub(super) fn opcode_xochip_0xF000(&mut self) {
-        self.I =  self.next_opcode_ext;
+        self.I = self.next_opcode_ext;
         self.PC += 4;
     }
 
