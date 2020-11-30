@@ -1,0 +1,106 @@
+# For use with Octo: http://johnearnest.github.io/Octo/
+# An awkwardly verbose and inefficient example ROM for debugging
+
+:alias x v0
+:alias y v1
+:alias skip v6
+:alias dt v7
+
+: font
+	0xF8 0x80 0x80 0x80 0xE0 0x80 0x80 0xF8 # E
+	0x88 0x88 0x50 0x20 0x50 0x88 0x88 0x88 # X
+	0x20 0x50 0x88 0x88 0xF8 0x88 0x88 0x88 # A
+	0x88 0xD8 0xA8 0x88 0x88 0x88 0x88 0x88 # M
+	0xE0 0x90 0x88 0x88 0x90 0xE0 0x80 0x80 # P
+	0x80 0x80 0x80 0x80 0x80 0x80 0x80 0xF8 # L
+
+: data
+	0x00 0x00 0x00 0x00
+
+: main
+	skip := 8
+	x := 12
+	y := 6
+	#print "EXAMPLE"
+	printe
+	
+	x := 28
+	y := 16
+	i := data
+	v2 := 0x24
+	v4 := 0x42
+	v5 := 0x3C
+	save v2 - v5
+	i := data
+	sprite x y 4
+	
+	dt := 30
+	delay := dt
+	loop
+		dt := delay
+		if dt == 0 begin
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			scroll-left
+			loop again
+		end
+	again
+
+: printe
+	i := font
+	sprite x y 8
+	x += 6
+	printx
+	return
+	
+: printx
+	i += skip
+	sprite x y 8
+	x += 6
+	printa
+	return
+
+: printa
+	i += skip
+	sprite x y 8
+	x += 6
+	printm
+	return
+	
+: printm
+	i += skip
+	sprite x y 8
+	x += 6
+	printp
+	return
+	
+: printp
+	i += skip
+	sprite x y 8
+	x += 6
+	printl
+	return
+	
+: printl
+	i += skip
+	sprite x y 8
+	x += 6
+	printe2
+	return
+	
+: printe2
+	i := font
+	sprite x y 8
+	x += 6
+	return
