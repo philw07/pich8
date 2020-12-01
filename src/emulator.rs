@@ -39,6 +39,8 @@ pub struct Emulator {
     pause_time: Instant,
     dialog_handler: DialogHandler,
     modifiers_state: ModifiersState,
+    last_correction_cpu: Instant,
+    counter_cpu: u32,
     last_correction_timer: Instant,
     counter_timer: u32,
     force_redraw: bool,
@@ -85,6 +87,8 @@ impl Emulator {
             dialog_handler: DialogHandler::new(),
             fps_counter: FpsCounter::new(),
             modifiers_state: ModifiersState::empty(),
+            last_correction_cpu: Instant::now(),
+            counter_cpu: 0,
             last_correction_timer: Instant::now(),
             counter_timer: 0,
             force_redraw: true,
@@ -219,13 +223,26 @@ impl Emulator {
                 }
                 Event::MainEventsCleared => {
                     if !self.pause {
-                        // Perform
+                        // Perform emulation
                         let nanos_per_cycle = 1_000_000_000 / self.cpu_speed as u64;
                         if self.last_cycle.elapsed().as_nanos() as u64 >= nanos_per_cycle * 10 {
-                            let cycles = (self.last_cycle.elapsed().as_nanos() as f64
+                            let mut cycles = (self.last_cycle.elapsed().as_nanos() as f64
                                 / nanos_per_cycle as f64)
-                                as u64;
+                                as u32;
                             self.last_cycle = Instant::now();
+
+                            // Check if additional cycles are needed
+                            if self.last_correction_cpu.elapsed().as_secs_f64() >= 0.25 {
+                                let target = self.cpu_speed / 4;
+                                if self.counter_cpu < target {
+                                    cycles += target - self.counter_cpu;
+                                }
+                                self.last_correction_cpu = Instant::now();
+                                self.counter_cpu = 0;
+                            } else {
+                                self.counter_cpu += cycles;
+                            }
+
                             for _ in 0..cycles {
                                 if let Err(e) = self.cpu.tick(&self.input) {
                                     self.gui.display_error(&format!("Error: {}", e));
@@ -242,7 +259,6 @@ impl Emulator {
                         {
                             self.last_timer = Instant::now();
                             let mut reps = 1;
-                            let mut reset_counter = false;
 
                             // Check and correct frequency regularly
                             if self.last_correction_timer.elapsed().as_secs_f64() >= 0.25 {
@@ -251,7 +267,9 @@ impl Emulator {
                                     reps += target - self.counter_timer - 1;
                                 }
                                 self.last_correction_timer = Instant::now();
-                                reset_counter = true;
+                                self.counter_timer = 0;
+                            } else {
+                                self.counter_timer += reps;
                             }
 
                             for _ in 0..reps {
@@ -263,11 +281,6 @@ impl Emulator {
                                     }
                                 }
                                 self.cpu.update_timers();
-                                self.counter_timer += 1;
-                            }
-
-                            if reset_counter {
-                                self.counter_timer = 0;
                             }
                         }
                     } else if self.step {
