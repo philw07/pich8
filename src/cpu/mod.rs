@@ -135,7 +135,7 @@ impl CPU {
             next_opcode_ext: 0,
             sp: 0,
 
-            draw: false,
+            draw: true,
             key_wait: false,
             key_reg: 0,
             quirk_load_store: true,

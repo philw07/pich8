@@ -12,6 +12,7 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_schip_0x00CN(&mut self, n: u8) {
         self.vmem.scroll_down(n as usize);
+        self.draw = true;
         self.PC += 2;
     }
 
@@ -19,6 +20,7 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_xochip_0x00DN(&mut self, n: u8) {
         self.vmem.scroll_up(n as usize);
+        self.draw = true;
         self.PC += 2;
     }
 
@@ -41,6 +43,7 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_schip_0x00FB(&mut self) {
         self.vmem.scroll_right();
+        self.draw = true;
         self.PC += 2;
     }
 
@@ -48,6 +51,7 @@ impl CPU {
     #[inline]
     pub(super) fn opcode_schip_0x00FC(&mut self) {
         self.vmem.scroll_left();
+        self.draw = true;
         self.PC += 2;
     }
 
