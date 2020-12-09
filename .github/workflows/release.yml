@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            executable: pich8
+          - os: windows-latest
+            executable: pich8.exe
+          - os: macos-latest
+            executable: pich8
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get install -y libasound2-dev libssl-dev
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --verbose
+    - name: Strip binary
+      run: strip target/release/${{ matrix.executable }}
+    - uses: actions/upload-artifact@v2
+      with:
+        name: pich8-release-${{ runner.os }}
+        path: |
+          target/release/${{ matrix.executable }}
+          LICENSE
+          NOTICE
+          README.md
