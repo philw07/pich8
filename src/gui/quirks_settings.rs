@@ -6,15 +6,21 @@ pub enum Quirk {
     Draw = 2,
     Jump = 3,
     VfOrder = 4,
+    PartialWrapH = 5,
+    PartialWrapV = 6,
 }
 
 pub struct QuirksSettings {
-    quirks: [bool; 5],
+    quirks: [bool; Self::NUM_QUIRKS],
 }
 
 impl QuirksSettings {
+    pub const NUM_QUIRKS: usize = 7;
+
     pub fn new() -> Self {
-        Self { quirks: [false; 5] }
+        Self {
+            quirks: [false; Self::NUM_QUIRKS],
+        }
     }
 
     pub fn get(&self, quirk: Quirk) -> bool {

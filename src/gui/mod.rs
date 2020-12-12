@@ -51,7 +51,6 @@ pub struct GUI {
     pub flag_pause: bool,
     pub cpu_speed: u32,
     cpu_multiplier: u32,
-    pub flag_vertical_wrapping: bool,
     pub flag_mute: bool,
     pub volume: f32,
 
@@ -167,7 +166,6 @@ impl GUI {
             cpu_speed: 0,
             cpu_multiplier: 1,
 
-            flag_vertical_wrapping: false,
             flag_mute: false,
             volume: 0.0,
 
@@ -468,6 +466,14 @@ impl GUI {
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Jump));
                     MenuItem::new(im_str!("VF Order"))
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::VfOrder));
+                    MenuItem::new(im_str!("Partial Wrapping - Horizontal")).build_with_ref(
+                        &ui,
+                        &mut self.quirks_settings.get_mut(Quirk::PartialWrapH),
+                    );
+                    MenuItem::new(im_str!("Partial Wrapping - Vertical")).build_with_ref(
+                        &ui,
+                        &mut self.quirks_settings.get_mut(Quirk::PartialWrapV),
+                    );
                     ui.separator();
 
                     let mut preset_handler = QuirksPresetHandler::new(&mut self.quirks_settings);
@@ -486,8 +492,6 @@ impl GUI {
 
                     quirks_menu.end(&ui);
                 }
-                MenuItem::new(im_str!("Vertical Wrapping"))
-                    .build_with_ref(&ui, &mut self.flag_vertical_wrapping);
                 ui.separator();
 
                 let mut vol = (self.volume * 100.0) as u8;

@@ -153,7 +153,11 @@ impl VideoMemory {
     }
 
     pub fn scroll_down(&mut self, lines: usize) {
-        let lines = if self.video_mode == VideoMode::Default { lines * 2 } else { lines };
+        let lines = if self.video_mode == VideoMode::Default {
+            lines * 2
+        } else {
+            lines
+        };
         for y in (0..self.render_height()).rev() {
             for x in 0..self.render_width() {
                 for plane in &[Plane::First, Plane::Second] {
@@ -172,7 +176,11 @@ impl VideoMemory {
     }
 
     pub fn scroll_up(&mut self, lines: usize) {
-        let lines = if self.video_mode == VideoMode::Default { lines * 2 } else { lines };
+        let lines = if self.video_mode == VideoMode::Default {
+            lines * 2
+        } else {
+            lines
+        };
         for y in 0..self.render_height() {
             for x in 0..self.render_width() {
                 for plane in &[Plane::First, Plane::Second] {
@@ -191,7 +199,11 @@ impl VideoMemory {
     }
 
     pub fn scroll_left(&mut self) {
-        let dist = if self.video_mode == VideoMode::Default { 8 } else { 4 };
+        let dist = if self.video_mode == VideoMode::Default {
+            8
+        } else {
+            4
+        };
         for x in 0..self.render_width() {
             for y in 0..self.render_height() {
                 for plane in &[Plane::First, Plane::Second] {
@@ -210,7 +222,11 @@ impl VideoMemory {
     }
 
     pub fn scroll_right(&mut self) {
-        let dist = if self.video_mode == VideoMode::Default { 8 } else { 4 };
+        let dist = if self.video_mode == VideoMode::Default {
+            8
+        } else {
+            4
+        };
         for x in (0..self.render_width()).rev() {
             for y in 0..self.render_height() {
                 for plane in &[Plane::First, Plane::Second] {

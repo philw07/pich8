@@ -74,8 +74,9 @@ pub struct CPU {
     // Originally, a 16x16 sprite is only drawn if n == 0 AND extended display mode (128x64) is active (CHIP8.DOC by David Winter).
     // In default mode (64x32) however, if n (height) == 0, a 8x16 pixels sprite is drawn.
     // However, Octo and many other emulators only check for n == 0, so some ROMs (e.g. Eaty the Alien) assume this check instead.
-    pub quirk_draw: bool,        // Flag for draw quirk
-    pub vertical_wrapping: bool, // Flag for vertical wrapping
+    pub quirk_draw: bool,          // Flag for draw quirk
+    pub quirk_partialwrap_h: bool, // Flag for partial horizontal wrapping quirk
+    pub quirk_partialwrap_v: bool, // Flag for partial vertical wrapping quirk
 }
 
 #[allow(non_snake_case)]
@@ -143,7 +144,8 @@ impl CPU {
             quirk_draw: true,
             quirk_jump: true,
             quirk_vf_order: true,
-            vertical_wrapping: true,
+            quirk_partialwrap_h: false,
+            quirk_partialwrap_v: false,
         };
 
         // Load fontsets
@@ -370,6 +372,10 @@ impl CPU {
     }
 
     fn draw_sprite(&mut self, x: usize, y: usize, height: usize) {
+        // Wrap around
+        let x = x % self.vmem.width();
+        let y = y % self.vmem.height();
+
         let big_sprite =
             (self.vmem.video_mode == VideoMode::Extended || self.quirk_draw) && height == 0;
         let step = if big_sprite { 2 } else { 1 };
@@ -384,20 +390,26 @@ impl CPU {
             if self.vmem.current_plane() == *plane || self.vmem.current_plane() == Plane::Both {
                 let sprite = &self.mem[i..i + len];
                 i += len;
-                for (k, mut y) in (0..sprite.len()).step_by(step).zip(y..y + height) {
-                    // Wrap around
-                    let last_line = self.vmem.height();
-                    if y >= last_line {
-                        if self.vertical_wrapping {
-                            y %= last_line;
+
+                for (mut y, k) in (y..y + height).zip((0..sprite.len()).step_by(step)) {
+                    // Clip or wrap
+                    if y >= self.vmem.height() {
+                        if self.quirk_partialwrap_v {
+                            y %= self.vmem.height();
                         } else {
                             continue;
                         }
                     }
 
                     for (mut x, i) in (x..x + width).zip((0..width).rev()) {
-                        // Wrap around
-                        x %= self.vmem.width();
+                        // Clip or wrap
+                        if x >= self.vmem.width() {
+                            if self.quirk_partialwrap_h {
+                                x %= self.vmem.width();
+                            } else {
+                                continue;
+                            }
+                        }
 
                         // Get bit
                         let bit = if width == 16 {
