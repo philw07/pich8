@@ -208,7 +208,7 @@ fn test_opcodes() {
         assert_eq!(cpu.PC, 0x202);
     }
 
-    // 0xDXYN - No wrapping
+    // 0xDXYN - Completely on screen, no clipping/wrapping
     {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0xD0, 0x15]);
@@ -226,7 +226,25 @@ fn test_opcodes() {
         assert_eq!(cpu.draw, true);
         assert_eq!(cpu.PC, 0x202);
     }
-    // 0xDXYN - Wrapping x and y
+    // 0xDXYN - Wrapping when off screen
+    {
+        let mut cpu = CPU::new();
+        let _ = cpu.load_rom(&[0xD0, 0x15]);
+        cpu.V[0] = 71;
+        cpu.V[1] = 34;
+        cpu.I = 0x300;
+        cpu.mem[0x300..0x305].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        let _ = cpu.emulate_cycle();
+        for y in 2..7 {
+            for x in 7..15 {
+                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), true);
+            }
+        }
+        assert_eq!(cpu.V[0xF], 0);
+        assert_eq!(cpu.draw, true);
+        assert_eq!(cpu.PC, 0x202);
+    }
+    // 0xDXYN - Clipping x and y
     {
         let mut cpu = CPU::new();
         let _ = cpu.load_rom(&[0xD0, 0x15]);
@@ -239,17 +257,20 @@ fn test_opcodes() {
             x %= 64;
             for mut y in 30..35 {
                 y %= 32;
-                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), true);
+                assert_eq!(
+                    cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y),
+                    x >= 60 && y >= 30
+                );
             }
         }
         assert_eq!(cpu.draw, true);
         assert_eq!(cpu.PC, 0x202);
     }
-    // 0xDXYN - Vertical wrapping disabled
+    // 0xDXYN - Wrapping x, but not y
     {
         let mut cpu = CPU::new();
-        cpu.vertical_wrapping = false;
         let _ = cpu.load_rom(&[0xD0, 0x15]);
+        cpu.quirk_partialwrap_h = true;
         cpu.V[0] = 60;
         cpu.V[1] = 30;
         cpu.I = 0x300;
@@ -257,11 +278,50 @@ fn test_opcodes() {
         let _ = cpu.emulate_cycle();
         for mut x in 60..68 {
             x %= 64;
-            for y in 30..32 {
-                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), true);
+            for mut y in 30..35 {
+                y %= 32;
+                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), y >= 30);
             }
-            for y in 0..3 {
-                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), false);
+        }
+        assert_eq!(cpu.draw, true);
+        assert_eq!(cpu.PC, 0x202);
+    }
+    // 0xDXYN - Wrapping y, but not x
+    {
+        let mut cpu = CPU::new();
+        let _ = cpu.load_rom(&[0xD0, 0x15]);
+        cpu.quirk_partialwrap_v = true;
+        cpu.V[0] = 60;
+        cpu.V[1] = 30;
+        cpu.I = 0x300;
+        cpu.mem[0x300..0x305].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        let _ = cpu.emulate_cycle();
+        for mut x in 60..68 {
+            x %= 64;
+            for mut y in 30..35 {
+                y %= 32;
+                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), x >= 60);
+            }
+        }
+        assert_eq!(cpu.draw, true);
+        assert_eq!(cpu.PC, 0x202);
+    }
+    // 0xDXYN - Wrapping x and y
+    {
+        let mut cpu = CPU::new();
+        let _ = cpu.load_rom(&[0xD0, 0x15]);
+        cpu.quirk_partialwrap_h = true;
+        cpu.quirk_partialwrap_v = true;
+        cpu.V[0] = 60;
+        cpu.V[1] = 30;
+        cpu.I = 0x300;
+        cpu.mem[0x300..0x305].copy_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        let _ = cpu.emulate_cycle();
+        for mut x in 60..68 {
+            x %= 64;
+            for mut y in 30..35 {
+                y %= 32;
+                assert_eq!(cpu.vmem.get_plane(cpu.vmem.current_plane(), x, y), true);
             }
         }
         assert_eq!(cpu.draw, true);

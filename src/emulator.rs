@@ -420,7 +420,6 @@ impl Emulator {
         }
 
         self.cpu_speed = self.gui.cpu_speed as u32;
-        self.cpu.vertical_wrapping = self.gui.flag_vertical_wrapping;
         self.mute = self.gui.flag_mute;
         self.sound.set_volume(self.gui.volume);
 
@@ -430,6 +429,8 @@ impl Emulator {
         self.cpu.quirk_draw = quirks.get(Quirk::Draw);
         self.cpu.quirk_jump = quirks.get(Quirk::Jump);
         self.cpu.quirk_vf_order = quirks.get(Quirk::VfOrder);
+        self.cpu.quirk_partialwrap_h = quirks.get(Quirk::PartialWrapH);
+        self.cpu.quirk_partialwrap_v = quirks.get(Quirk::PartialWrapV);
 
         self.step = self.gui.flag_step;
         self.gui.flag_step = false;

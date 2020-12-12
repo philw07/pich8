@@ -18,7 +18,7 @@ I can definitely recommend giving it a try, I learned a lot during this journey.
 - Save and load current CPU state
 - Fullscreen mode and possibility to change background and foreground colors
 - Change CPU speed dynamically
-- Disable several quirks (enabled by default) and vertical wrapping (some ROMs require specific quirks or vertical wrapping disabled)  
+- Enable or disable several quirks (some ROMs require specific quirks)  
 - Debug windows displaying current register values, stack and executed opcodes as well as allowing to set breakpoints
 
 ## Screenshots
@@ -49,8 +49,6 @@ Without going too much into detail, the following are just guidelines and some R
 - Quirks
   - The default setting usually works good for legacy ROMs, however some title may need specific quirks turned off.
   - Modern ROMs written with Octo usually use different settings, therefore an Octo preset is included.
-- Vertical wrapping
-  - Should usually stay on, but there are specific ROMs where it needs to be turned off (e.g. BLITZ).
 - CPU speed
   - Legacy CHIP-8 ROMs usually work well around the default speed setting.
   - S-CHIP ROMs usually require one of the faster speed settings.

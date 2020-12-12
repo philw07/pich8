@@ -11,8 +11,10 @@ pub struct QuirksPresetHandler<'a> {
 }
 
 impl<'a> QuirksPresetHandler<'a> {
-    const QUIRKS_PRESET_DEFAULT: [bool; 5] = [true; 5];
-    const QUIRKS_PRESET_OCTO: [bool; 5] = [false, false, true, false, true];
+    const QUIRKS_PRESET_DEFAULT: [bool; QuirksSettings::NUM_QUIRKS] =
+        [true, true, true, true, true, false, false];
+    const QUIRKS_PRESET_OCTO: [bool; QuirksSettings::NUM_QUIRKS] =
+        [false, false, true, false, true, true, true];
 
     pub fn new(settings: &'a mut QuirksSettings) -> Self {
         Self { settings }
@@ -35,7 +37,7 @@ impl<'a> QuirksPresetHandler<'a> {
         }
     }
 
-    fn get_preset(&self, preset: QuirksPreset) -> [bool; 5] {
+    fn get_preset(&self, preset: QuirksPreset) -> [bool; QuirksSettings::NUM_QUIRKS] {
         match preset {
             QuirksPreset::Default => Self::QUIRKS_PRESET_DEFAULT,
             QuirksPreset::Octo => Self::QUIRKS_PRESET_OCTO,
