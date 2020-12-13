@@ -5,6 +5,8 @@ I've recently decided to look into emulators and found many recommendations to s
 Since I had just started to read [the book](https://doc.rust-lang.org/book/), I've decided to use this opportunity as my first Rust project.  
 I can definitely recommend giving it a try, I learned a lot during this journey.
 
+[![dependency status](https://deps.rs/repo/github/philw07/pich8/status.svg)](https://deps.rs/repo/github/philw07/pich8)
+
 ![pich8](images/title.gif)
 
 ## Features
