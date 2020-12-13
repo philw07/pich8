@@ -1,6 +1,6 @@
 [package]
 name = "pich8"
-version = "1.0.0"
+version = "1.0.1"
 description = "A cross-platform CHIP-8, SUPER-CHIP and XO-CHIP interpreter and debugger written in Rust"
 authors = ["Philipp W <phil.w07@gmail.com>"]
 edition = "2018"
