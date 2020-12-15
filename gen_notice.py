@@ -6,7 +6,7 @@ import asyncio
 from os import path
 from bs4 import BeautifulSoup
 
-OUT_FILE = 'NOTICES'
+OUT_FILE = 'NOTICE'
 LICENSE_FILES = ['LICENSE', 'LICENSE.txt', 'LICENSE.md', 'LICENSE-MIT', 'LICENSE-MIT.md', 'LICENCE-MIT', 'LICENSE-APACHE', 'UNLICENSE']
 HEADER = 'The source code of this package doesn\'t include any third party code,\nbut it depends on third party libraries which are statically linked into the resulting binary.\n\n'
 
