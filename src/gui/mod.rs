@@ -232,6 +232,12 @@ impl GUI {
             .handle_event(self.imgui.io_mut(), gl_window.window(), &event);
     }
 
+    pub fn prepare_frame(&mut self, display: &Display) -> Result<(), String> {
+        self.platform.prepare_frame(self.imgui.io_mut(), display.gl_window().window())
+            .map_err(|e| format!("Failed to prepare UI frame: {}", e))?;
+        Ok(())
+    }
+
     pub fn render<S: Surface>(
         &mut self,
         delta_time: Duration,
