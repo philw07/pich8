@@ -656,9 +656,19 @@ fn test_opcodes_xochip() {
     // 0xFN01
     {
         let mut cpu = CPU::new();
-        let _ = cpu.load_rom(&[0xF0, 0x01]);
+        let _ = cpu.load_rom(&[0xF0, 0x01, 0xF1, 0x01, 0xF2, 0x01, 0xF3, 0x01]);
         let _ = cpu.emulate_cycle();
         assert_eq!(cpu.PC, 0x202);
+        assert_eq!(cpu.vmem.current_plane(), Plane::None);
+        let _ = cpu.emulate_cycle();
+        assert_eq!(cpu.PC, 0x204);
+        assert_eq!(cpu.vmem.current_plane(), Plane::First);
+        let _ = cpu.emulate_cycle();
+        assert_eq!(cpu.PC, 0x206);
+        assert_eq!(cpu.vmem.current_plane(), Plane::Second);
+        let _ = cpu.emulate_cycle();
+        assert_eq!(cpu.PC, 0x208);
+        assert_eq!(cpu.vmem.current_plane(), Plane::Both);
     }
 
     // 0xF002
