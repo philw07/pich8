@@ -292,7 +292,9 @@ impl Emulator {
                     }
 
                     // Always request redrawing to keep the GUI updated
-                    self.gui.prepare_frame(self.display.display()).expect("Failed to prepare UI frame");
+                    self.gui
+                        .prepare_frame(self.display.display())
+                        .expect("Failed to prepare UI frame");
                     self.display.display().gl_window().window().request_redraw();
                 }
                 Event::RedrawRequested(_) => {
