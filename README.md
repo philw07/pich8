@@ -1,12 +1,14 @@
 # pich8
 A cross-platform CHIP-8, SUPER-CHIP and XO-CHIP interpreter and debugger written in Rust
 
+![Build and Test](https://github.com/philw07/pich8/workflows/Build%20and%20Test/badge.svg?branch=master)
+[![Dependency Status](https://deps.rs/repo/github/philw07/pich8/status.svg)](https://deps.rs/repo/github/philw07/pich8)
+
 I've recently decided to look into emulators and found many recommendations to start with a CHIP-8 interpreter.  
 Since I had just started to read [the book](https://doc.rust-lang.org/book/), I've decided to use this opportunity as my first Rust project.  
 I can definitely recommend giving it a try, I learned a lot during this journey.
 
-![Build and Test](https://github.com/philw07/pich8/workflows/Build%20and%20Test/badge.svg?branch=master)
-[![Dependency Status](https://deps.rs/repo/github/philw07/pich8/status.svg)](https://deps.rs/repo/github/philw07/pich8)
+I'm currently porting the emulator to Go, check out [pich8-go](https://github.com/philw07/pich8-go).
 
 ![pich8](images/title.gif)
 

@@ -233,7 +233,8 @@ impl GUI {
     }
 
     pub fn prepare_frame(&mut self, display: &Display) -> Result<(), String> {
-        self.platform.prepare_frame(self.imgui.io_mut(), display.gl_window().window())
+        self.platform
+            .prepare_frame(self.imgui.io_mut(), display.gl_window().window())
             .map_err(|e| format!("Failed to prepare UI frame: {}", e))?;
         Ok(())
     }

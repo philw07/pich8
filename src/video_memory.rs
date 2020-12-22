@@ -349,7 +349,7 @@ mod video_memory_test {
         for i in 0..64 * 32 {
             assert_eq!(vmem.get_index_plane(vmem.plane, i), false);
         }
-        // Clear - Default
+        // Clear - HiRes
         vmem = VideoMemory::new();
         vmem.video_mode = VideoMode::HiRes;
         vmem.set_all(true);
@@ -357,7 +357,7 @@ mod video_memory_test {
         for i in 0..64 * 64 {
             assert_eq!(vmem.get_index_plane(vmem.plane, i), false);
         }
-        // Clear - Default
+        // Clear - Extended
         vmem = VideoMemory::new();
         vmem.video_mode = VideoMode::Extended;
         vmem.set_all(true);
