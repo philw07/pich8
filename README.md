@@ -8,7 +8,7 @@ I've recently decided to look into emulators and found many recommendations to s
 Since I had just started to read [the book](https://doc.rust-lang.org/book/), I've decided to use this opportunity as my first Rust project.  
 I can definitely recommend giving it a try, I learned a lot during this journey.
 
-I'm currently porting the emulator to Go, check out [pich8-go](https://github.com/philw07/pich8-go).
+I also ported the interpreter (partly) to Go: [pich8-go](https://github.com/philw07/pich8-go).
 
 ![pich8](images/title.gif)
 
