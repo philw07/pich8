@@ -23,7 +23,7 @@ rodio = "0.13.0"
 getopts = "0.2.21"
 url = { version = "2.2.0", optional = true }
 reqwest = { version = "0.11.0", features = ["blocking"], optional = true }
-image = "0.23.12"
+image = "0.23.13"
 
 [features]
 default = ["rom-download"]
