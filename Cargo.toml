@@ -22,7 +22,7 @@ tinyfiledialogs = "3.3.10"
 rodio = "0.13.0"
 getopts = "0.2.21"
 url = { version = "2.2.1", optional = true }
-reqwest = { version = "0.11.1", features = ["blocking"], optional = true }
+reqwest = { version = "0.11.2", features = ["blocking"], optional = true }
 image = "0.23.14"
 
 [features]
