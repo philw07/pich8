@@ -22,7 +22,7 @@ jobs:
     - uses: Swatinem/rust-cache@v1
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo apt-get install -y libasound2-dev libssl-dev
+      run: sudo apt update && sudo apt-get install -y libasound2-dev libssl-dev
     - name: Build
       uses: actions-rs/cargo@v1
       with:
