@@ -19,7 +19,7 @@ imgui = "0.6.1"
 imgui-glium-renderer = "0.6.1"
 imgui-winit-support = "0.6.1"
 tinyfiledialogs = "3.3.10"
-rodio = "0.13.1"
+rodio = "0.14.0"
 getopts = "0.2.21"
 url = { version = "2.2.2", optional = true }
 reqwest = { version = "0.11.3", features = ["blocking"], optional = true }
