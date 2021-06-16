@@ -11,7 +11,7 @@ license = "MIT"
 winres = "0.1.11"
 
 [dependencies]
-rand = "0.8.3"
+rand = "0.8.4"
 serde = { version = "1.0.126", features = ["derive"] }
 rmp-serde = "0.15.5"
 glium = "0.29.1"
