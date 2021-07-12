@@ -14,7 +14,7 @@ winres = "0.1.11"
 rand = "0.8.4"
 serde = { version = "1.0.126", features = ["derive"] }
 rmp-serde = "0.15.5"
-glium = "0.29.1"
+glium = "0.30.1"
 imgui = "0.6.1"
 imgui-glium-renderer = "0.6.1"
 imgui-winit-support = "0.6.1"
