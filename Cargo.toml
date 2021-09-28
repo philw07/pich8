@@ -8,7 +8,7 @@ build = "build.rs"
 license = "MIT"
 
 [target.'cfg(windows)'.build-dependencies]
-winres = "0.1.11"
+winres = "0.1.12"
 
 [dependencies]
 rand = "0.8.4"
