@@ -4,7 +4,7 @@ pub use color_settings::Color;
 use color_settings::ColorSettings;
 use glium::{glutin::event::Event, Display, Surface};
 use imgui::{
-    im_str, ColorEdit, Condition, Context, FontId, FontSource, ImStr, ImString, MenuItem, Slider,
+    ColorEdit, Condition, Context, FontId, FontSource, MenuItem, Slider,
     StyleColor, Ui, Window,
 };
 use imgui_glium_renderer::Renderer;
@@ -58,25 +58,22 @@ pub struct GUI {
 
     flag_about: bool,
     flag_error: bool,
-    error_text: ImString,
+    error_text: String,
     pub flag_downloading: bool,
     pub flag_step: bool,
     pub flag_step_timers: bool,
 
     flag_breakpoint_pc: bool,
-    breakpoint_pc_im: ImString,
     breakpoint_pc: String,
     flag_breakpoint_i: bool,
-    breakpoint_i_im: ImString,
     breakpoint_i: String,
     flag_breakpoint_opcode: bool,
-    breakpoint_opcode_im: ImString,
     breakpoint_opcode: String,
 
-    about_name: ImString,
-    about_version: ImString,
-    about_description: ImString,
-    about_license: ImString,
+    about_name: String,
+    about_version: String,
+    about_description: String,
+    about_license: String,
 }
 
 impl GUI {
@@ -109,15 +106,12 @@ impl GUI {
         }]);
 
         // Set default breakpoint values
-        let mut breakpoint_pc_im = ImString::with_capacity(4);
-        breakpoint_pc_im.push_str("0");
-        let breakpoint_pc = String::from(breakpoint_pc_im.to_str());
-        let mut breakpoint_i_im = ImString::with_capacity(4);
-        breakpoint_i_im.push_str("0");
-        let breakpoint_i = String::from(breakpoint_i_im.to_str());
-        let mut breakpoint_opcode_im = ImString::with_capacity(4);
-        breakpoint_opcode_im.push_str("****");
-        let breakpoint_opcode = String::from(breakpoint_opcode_im.to_str());
+        let mut breakpoint_pc = String::with_capacity(4);
+        breakpoint_pc.push_str("0");
+        let mut breakpoint_i = String::with_capacity(4);
+        breakpoint_i.push_str("0");
+        let mut breakpoint_opcode = String::with_capacity(4);
+        breakpoint_opcode.push_str("****");
 
         // Set default presets
         let mut color_settings = ColorSettings::new();
@@ -173,28 +167,25 @@ impl GUI {
 
             flag_about: false,
             flag_error: false,
-            error_text: ImString::new(""),
+            error_text: String::new(),
             flag_downloading: false,
             flag_step: false,
             flag_step_timers: false,
 
             flag_breakpoint_pc: false,
-            breakpoint_pc_im,
             breakpoint_pc,
             flag_breakpoint_i: false,
-            breakpoint_i_im,
             breakpoint_i,
             flag_breakpoint_opcode: false,
-            breakpoint_opcode_im,
             breakpoint_opcode,
 
-            about_name: ImString::from(env!("CARGO_PKG_NAME").to_string()),
-            about_version: ImString::from(env!("CARGO_PKG_VERSION").to_string()),
-            about_description: ImString::from(env!("CARGO_PKG_DESCRIPTION").to_string()),
-            about_license: ImString::from(format!(
+            about_name: env!("CARGO_PKG_NAME").to_string(),
+            about_version: env!("CARGO_PKG_VERSION").to_string(),
+            about_description: env!("CARGO_PKG_DESCRIPTION").to_string(),
+            about_license: format!(
                 "Released under the {} license",
                 env!("CARGO_PKG_LICENSE").to_string()
-            )),
+            ),
         }
     }
 
@@ -263,39 +254,39 @@ impl GUI {
         let ui = self.imgui.frame();
         let custom_font = ui.push_font(self.custom_font);
         if let Some(menu_bar) = ui.begin_main_menu_bar() {
-            if let Some(menu) = ui.begin_menu(im_str!("File"), true) {
+            if let Some(menu) = ui.begin_menu("File") {
                 self.is_open = true;
-                MenuItem::new(im_str!("Open ROM or State..."))
-                    .shortcut(im_str!("Ctrl + O"))
+                MenuItem::new("Open ROM or State...")
+                    .shortcut("Ctrl + O")
                     .build_with_ref(&ui, &mut self.flag_open);
 
                 #[cfg(feature = "rom-download")]
-                MenuItem::new(im_str!("Open ROM from URL..."))
-                    .shortcut(im_str!("Ctrl + Shift + O"))
+                MenuItem::new("Open ROM from URL...")
+                    .shortcut("Ctrl + Shift + O")
                     .build_with_ref(&ui, &mut self.flag_open_rom_url);
 
-                MenuItem::new(im_str!("Save State..."))
-                    .shortcut(im_str!("Ctrl + S"))
+                MenuItem::new("Save State...")
+                    .shortcut("Ctrl + S")
                     .build_with_ref(&ui, &mut self.flag_save_state);
                 ui.separator();
-                MenuItem::new(im_str!("Reset"))
-                    .shortcut(im_str!("F5"))
+                MenuItem::new("Reset")
+                    .shortcut("F5")
                     .build_with_ref(&ui, &mut self.flag_reset);
                 ui.separator();
-                MenuItem::new(im_str!("Exit"))
-                    .shortcut(im_str!("Esc"))
+                MenuItem::new("Exit")
+                    .shortcut("Esc")
                     .build_with_ref(&ui, &mut self.flag_exit);
-                menu.end(&ui);
+                menu.end();
             }
-            if let Some(menu) = ui.begin_menu(im_str!("View"), true) {
+            if let Some(menu) = ui.begin_menu("View") {
                 self.is_open = true;
-                MenuItem::new(im_str!("Fullscreen"))
-                    .shortcut(im_str!("F11"))
+                MenuItem::new("Fullscreen")
+                    .shortcut("F11")
                     .build_with_ref(&ui, &mut self.flag_fullscreen);
                 ui.separator();
-                if let Some(menu) = ui.begin_menu(im_str!("Colors"), true) {
+                if let Some(menu) = ui.begin_menu("Colors") {
                     if ColorEdit::new(
-                        im_str!("Background Color"),
+                        "Background Color",
                         self.color_settings.get_mut(Color::Background),
                     )
                     .build(&ui)
@@ -303,7 +294,7 @@ impl GUI {
                         self.color_settings.changed = true;
                     }
                     if ColorEdit::new(
-                        im_str!("Foreground Color"),
+                        "Foreground Color",
                         self.color_settings.get_mut(Color::Plane1),
                     )
                     .build(&ui)
@@ -311,7 +302,7 @@ impl GUI {
                         self.color_settings.changed = true;
                     }
                     if ColorEdit::new(
-                        im_str!("Foreground Color 2 (XO-CHIP)"),
+                        "Foreground Color 2 (XO-CHIP)",
                         self.color_settings.get_mut(Color::Plane2),
                     )
                     .build(&ui)
@@ -319,7 +310,7 @@ impl GUI {
                         self.color_settings.changed = true;
                     }
                     if ColorEdit::new(
-                        im_str!("Foreground Color 3 (XO-CHIP)"),
+                        "Foreground Color 3 (XO-CHIP)",
                         self.color_settings.get_mut(Color::PlaneBoth),
                     )
                     .build(&ui)
@@ -334,7 +325,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("pich8 Default Preset"),
+                        "pich8 Default Preset",
                         ColorPreset::Default,
                     ) {
                         color_changed = true;
@@ -342,7 +333,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo Classic Preset"),
+                        "Octo Classic Preset",
                         ColorPreset::OctoClassic,
                     ) {
                         color_changed = true;
@@ -350,7 +341,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo LCD Preset"),
+                        "Octo LCD Preset",
                         ColorPreset::OctoLcd,
                     ) {
                         color_changed = true;
@@ -358,7 +349,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo Hotdog Preset"),
+                        "Octo Hotdog Preset",
                         ColorPreset::OctoHotdog,
                     ) {
                         color_changed = true;
@@ -366,7 +357,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo Gray Preset"),
+                        "Octo Gray Preset",
                         ColorPreset::OctoGray,
                     ) {
                         color_changed = true;
@@ -374,7 +365,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo CGA0 Preset"),
+                        "Octo CGA0 Preset",
                         ColorPreset::OctoCga0,
                     ) {
                         color_changed = true;
@@ -382,7 +373,7 @@ impl GUI {
                     if Self::menu_item_color_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo CGA1 Preset"),
+                        "Octo CGA1 Preset",
                         ColorPreset::OctoCga1,
                     ) {
                         color_changed = true;
@@ -391,28 +382,28 @@ impl GUI {
                         self.color_settings.changed = true;
                     }
 
-                    menu.end(&ui);
+                    menu.end();
                 }
                 ui.separator();
-                MenuItem::new(im_str!("Display FPS"))
-                    .shortcut(im_str!("F1"))
+                MenuItem::new("Display FPS")
+                    .shortcut("F1")
                     .build_with_ref(&ui, &mut self.flag_display_fps);
-                MenuItem::new(im_str!("Debug"))
-                    .shortcut(im_str!("F7"))
+                MenuItem::new("Debug")
+                    .shortcut("F7")
                     .build_with_ref(&ui, &mut self.flag_debug);
                 if self.flag_debug {
-                    MenuItem::new(im_str!("Reset Debug Window Layout"))
+                    MenuItem::new("Reset Debug Window Layout")
                         .build_with_ref(&ui, &mut reset_debug_layout);
                 }
-                menu.end(&ui);
+                menu.end();
             }
-            if let Some(menu) = ui.begin_menu(im_str!("Settings"), true) {
+            if let Some(menu) = ui.begin_menu("Settings") {
                 self.is_open = true;
-                MenuItem::new(im_str!("Pause"))
-                    .shortcut(im_str!("P"))
+                MenuItem::new("Pause")
+                    .shortcut("P")
                     .build_with_ref(&ui, &mut self.flag_pause);
                 ui.separator();
-                if let Some(cpu_speed_menu) = ui.begin_menu(im_str!("CPU Speed"), true) {
+                if let Some(cpu_speed_menu) = ui.begin_menu("CPU Speed") {
                     Self::cpu_speed_menu_item(
                         &ui,
                         "Slowest",
@@ -452,7 +443,7 @@ impl GUI {
                     ui.separator();
                     let before = self.cpu_multiplier == 50;
                     let mut after = before;
-                    MenuItem::new(&im_str!("50x")).build_with_ref(&ui, &mut after);
+                    MenuItem::new(&"50x").build_with_ref(&ui, &mut after);
                     if !before && after {
                         self.cpu_multiplier = 50;
                         self.cpu_speed *= 50;
@@ -460,24 +451,24 @@ impl GUI {
                         self.cpu_multiplier = 1;
                         self.cpu_speed /= 50;
                     }
-                    cpu_speed_menu.end(&ui);
+                    cpu_speed_menu.end();
                 }
-                if let Some(quirks_menu) = ui.begin_menu(im_str!("Quirks"), true) {
-                    MenuItem::new(im_str!("Load/Store"))
+                if let Some(quirks_menu) = ui.begin_menu("Quirks") {
+                    MenuItem::new("Load/Store")
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::LoadStore));
-                    MenuItem::new(im_str!("Shift"))
+                    MenuItem::new("Shift")
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Shift));
-                    MenuItem::new(im_str!("Draw"))
+                    MenuItem::new("Draw")
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Draw));
-                    MenuItem::new(im_str!("Jump0"))
+                    MenuItem::new("Jump0")
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::Jump));
-                    MenuItem::new(im_str!("VF Order"))
+                    MenuItem::new("VF Order")
                         .build_with_ref(&ui, &mut self.quirks_settings.get_mut(Quirk::VfOrder));
-                    MenuItem::new(im_str!("Partial Wrapping - Horizontal")).build_with_ref(
+                    MenuItem::new("Partial Wrapping - Horizontal").build_with_ref(
                         &ui,
                         &mut self.quirks_settings.get_mut(Quirk::PartialWrapH),
                     );
-                    MenuItem::new(im_str!("Partial Wrapping - Vertical")).build_with_ref(
+                    MenuItem::new("Partial Wrapping - Vertical").build_with_ref(
                         &ui,
                         &mut self.quirks_settings.get_mut(Quirk::PartialWrapV),
                     );
@@ -487,54 +478,53 @@ impl GUI {
                     Self::menu_item_quirks_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Default Preset (Legacy ROMs)"),
+                        "Default Preset (Legacy ROMs)",
                         QuirksPreset::Default,
                     );
                     Self::menu_item_quirks_preset(
                         &ui,
                         &mut preset_handler,
-                        im_str!("Octo Preset"),
+                        "Octo Preset",
                         QuirksPreset::Octo,
                     );
 
-                    quirks_menu.end(&ui);
+                    quirks_menu.end();
                 }
                 ui.separator();
 
                 let mut vol = (self.volume * 100.0) as u8;
-                Slider::new(im_str!("Audio Volume"))
-                    .range(0..=100)
-                    .display_format(im_str!("%d %%"))
+                Slider::new("Audio Volume", 0, 100)
+                    .display_format("%d %%")
                     .build(&ui, &mut vol);
                 self.volume = vol as f32 / 100.0;
 
-                MenuItem::new(im_str!("Mute Audio"))
-                    .shortcut(im_str!("M"))
+                MenuItem::new("Mute Audio")
+                    .shortcut("M")
                     .build_with_ref(&ui, &mut self.flag_mute);
-                menu.end(&ui);
+                menu.end();
             }
-            if let Some(menu) = ui.begin_menu(im_str!("Help"), true) {
+            if let Some(menu) = ui.begin_menu("Help") {
                 self.is_open = true;
-                MenuItem::new(im_str!("About")).build_with_ref(&ui, &mut self.flag_about);
-                menu.end(&ui);
+                MenuItem::new("About").build_with_ref(&ui, &mut self.flag_about);
+                menu.end();
             }
 
             if self.flag_display_fps {
-                let fps = im_str!("{:.0} fps", fps);
-                let text_width = ui.calc_text_size(&fps, false, 0.0);
-                ui.same_line(window_width - (text_width[0] * 1.25));
+                let fps = format!("{:.0} fps", fps);
+                let text_width = ui.calc_text_size_with_opts(&fps, false, 0.0);
+                ui.same_line_with_pos(window_width - (text_width[0] * 1.25));
                 ui.text_colored([0.75, 0.75, 0.75, 1.0], fps);
             }
             if self.flag_downloading {
                 self.is_open = true;
-                let text = im_str!("Downloading...");
-                let text_size = ui.calc_text_size(text, false, 250.0);
+                let text = "Downloading...";
+                let text_size = ui.calc_text_size_with_opts(text, false, 250.0);
                 let dl_win_size = [text_size[0] + 50.0, text_size[1] + 40.0];
                 let dl_win_pos = [
                     window_width / 2.0 - dl_win_size[0] / 2.0,
                     window_height / 2.0 - dl_win_size[1] / 2.0,
                 ];
-                Window::new(im_str!("Downloading"))
+                Window::new("Downloading")
                     .position(dl_win_pos, Condition::Always)
                     .size(dl_win_size, Condition::Always)
                     .resizable(false)
@@ -551,10 +541,10 @@ impl GUI {
             }
             if self.flag_about {
                 self.is_open = true;
-                let app_name_size = ui.calc_text_size(about_name, false, 0.0);
-                let app_version_size = ui.calc_text_size(about_version, false, 0.0);
-                let app_license_size = ui.calc_text_size(about_license, false, 0.0);
-                let about_text_size = ui.calc_text_size(about_description, false, 250.0);
+                let app_name_size = ui.calc_text_size_with_opts(about_name, false, 0.0);
+                let app_version_size = ui.calc_text_size_with_opts(about_version, false, 0.0);
+                let app_license_size = ui.calc_text_size_with_opts(about_license, false, 0.0);
+                let about_text_size = ui.calc_text_size_with_opts(about_description, false, 250.0);
                 let about_win_size = [
                     about_text_size[0] + 50.0,
                     about_text_size[1]
@@ -568,7 +558,7 @@ impl GUI {
                     window_height / 2.0 - about_win_size[1] / 2.0,
                 ];
                 let custom_font_big = self.custom_font_big;
-                Window::new(im_str!("About"))
+                Window::new("About")
                     .opened(&mut self.flag_about)
                     .position(about_win_pos, Condition::Always)
                     .size(about_win_size, Condition::Always)
@@ -578,7 +568,7 @@ impl GUI {
                     .build(&ui, || {
                         let cfont_big = ui.push_font(custom_font_big);
                         Self::centered_text(&ui, about_name, about_win_size[0]);
-                        cfont_big.pop(&ui);
+                        cfont_big.pop();
 
                         Self::centered_text(&ui, about_version, about_win_size[0]);
 
@@ -595,14 +585,14 @@ impl GUI {
             }
             if self.flag_error {
                 self.is_open = true;
-                let text_size = ui.calc_text_size(&self.error_text, false, 250.0);
+                let text_size = ui.calc_text_size_with_opts(&self.error_text, false, 250.0);
                 let error_win_size = [text_size[0] + 50.0, text_size[1] + 40.0];
                 let error_win_pos = [
                     window_width / 2.0 - error_win_size[0] / 2.0,
                     window_height / 2.0 - error_win_size[1] / 2.0,
                 ];
                 let error_text = &self.error_text;
-                Window::new(im_str!("Error"))
+                Window::new("Error")
                     .opened(&mut self.flag_error)
                     .position(error_win_pos, Condition::Always)
                     .size(error_win_size, Condition::Always)
@@ -630,12 +620,12 @@ impl GUI {
 
                 let size = [130.0, 265.0];
                 let pos = [10.0, 40.0];
-                Window::new(im_str!("Registers"))
+                Window::new("Registers")
                     .position(pos, pos_condition)
                     .size(size, Condition::Always)
                     .resizable(false)
                     .build(&ui, || {
-                        ui.columns(2, im_str!("registers"), true);
+                        ui.columns(2, "registers", true);
 
                         Self::register_col_u16(&ui, "PC", cpu.PC());
                         Self::register_col_u16(&ui, "I ", cpu.I());
@@ -663,12 +653,12 @@ impl GUI {
 
                 let size = [130.0, 245.0];
                 let pos = [window_width - size[0] - 10.0, 40.0];
-                Window::new(im_str!("Stack"))
+                Window::new("Stack")
                     .position(pos, pos_condition)
                     .size(size, Condition::Always)
                     .resizable(false)
                     .build(&ui, || {
-                        ui.columns(2, im_str!("stack"), true);
+                        ui.columns(2, "stack", true);
                         Self::register_col_u8(&ui, "SP", cpu.sp() as u8);
                         ui.next_column();
                         ui.separator();
@@ -697,56 +687,48 @@ impl GUI {
                     window_height - size[1] - 10.0,
                 ];
                 let flag_breakpoint_pc = &mut self.flag_breakpoint_pc;
-                let breakpoint_pc_im = &mut self.breakpoint_pc_im;
                 let breakpoint_pc = &mut self.breakpoint_pc;
                 let flag_breakpoint_i = &mut self.flag_breakpoint_i;
-                let breakpoint_i_im = &mut self.breakpoint_i_im;
                 let breakpoint_i = &mut self.breakpoint_i;
                 let flag_breakpoint_opcode = &mut self.flag_breakpoint_opcode;
-                let breakpoint_opcode_im = &mut self.breakpoint_opcode_im;
                 let breakpoint_opcode = &mut self.breakpoint_opcode;
-                Window::new(im_str!("Breakpoints"))
+                Window::new("Breakpoints")
                     .position(pos, pos_condition)
                     .size(size, Condition::Always)
                     .resizable(false)
                     .build(&ui, || {
                         // Break on PC value
-                        if Self::breakpoint_input(
+                        Self::breakpoint_input(
                             &ui,
-                            im_str!("PC"),
+                            "PC",
                             flag_breakpoint_pc,
-                            breakpoint_pc_im,
+                            breakpoint_pc,
                             true,
-                        ) {
-                            *breakpoint_pc = String::from(breakpoint_pc_im.to_str());
-                        }
+                        );
 
-                        ui.same_line(0.0);
+                        ui.same_line();
                         ui.dummy([30.0, 0.0]);
 
                         // Break on I value
-                        ui.same_line(0.0);
-                        if Self::breakpoint_input(
+                        ui.same_line();
+                        Self::breakpoint_input(
                             &ui,
-                            im_str!("I "),
+                            "I ",
                             flag_breakpoint_i,
-                            breakpoint_i_im,
+                            breakpoint_i,
                             true,
-                        ) {
-                            *breakpoint_i = String::from(breakpoint_i_im.to_str());
-                        }
+                        );
 
                         // Break on opcode
                         if Self::breakpoint_input(
                             &ui,
-                            im_str!("Opcode"),
+                            "Opcode",
                             flag_breakpoint_opcode,
-                            breakpoint_opcode_im,
+                            breakpoint_opcode,
                             false,
                         ) {
                             // Sanitize and fill input
-                            let mut value: String = breakpoint_opcode_im
-                                .to_str()
+                            let mut value: String = breakpoint_opcode
                                 .chars()
                                 .map(|c| match c {
                                     '0'..='9' => c,
@@ -758,9 +740,6 @@ impl GUI {
                                 value.insert(0, '*');
                             }
 
-                            let mut new_im = ImString::with_capacity(4);
-                            new_im.push_str(&value);
-                            *breakpoint_opcode_im = new_im;
                             *breakpoint_opcode = value;
                         }
                     });
@@ -770,7 +749,7 @@ impl GUI {
                     2.0 * window_width / 3.0 - size[0] / 2.0,
                     window_height - size[1] - 10.0,
                 ];
-                Window::new(im_str!("Opcodes"))
+                Window::new("Opcodes")
                     .position(pos, pos_condition)
                     .size(size, Condition::Always)
                     .resizable(false)
@@ -784,7 +763,7 @@ impl GUI {
                         let style =
                             ui.push_style_color(StyleColor::Text, Self::COLOR_TEXT_DISABLED);
                         Self::opcode_text(&ui, "  Last", cpu.opcode(), &cpu.opcode_description());
-                        style.pop(&ui);
+                        style.pop();
                     });
 
                 let size = [347.0, 37.0];
@@ -795,22 +774,22 @@ impl GUI {
                 let mut pause = &mut self.flag_pause;
                 let step = &mut self.flag_step;
                 let step_timers = &mut self.flag_step_timers;
-                Window::new(im_str!("Debug"))
+                Window::new("Debug")
                     .position(pos, Condition::Always)
                     .size(size, Condition::Always)
                     .resizable(false)
                     .title_bar(false)
                     .build(&ui, || {
                         let button_size = [105.0, 20.0];
-                        Self::toggle_button(&ui, im_str!("Pause (P)"), button_size, &mut pause);
-                        ui.same_line(0.0);
-                        if Self::button_disabled(&ui, im_str!("Step (F8)"), button_size, !*pause) {
+                        Self::toggle_button(&ui, "Pause (P)", button_size, &mut pause);
+                        ui.same_line();
+                        if Self::button_disabled(&ui, "Step (F8)", button_size, !*pause) {
                             *step = true;
                         }
-                        ui.same_line(0.0);
+                        ui.same_line();
                         if Self::button_disabled(
                             &ui,
-                            im_str!("Step Timers (F9)"),
+                            "Step Timers (F9)",
                             button_size,
                             !*pause,
                         ) {
@@ -818,15 +797,16 @@ impl GUI {
                         }
                     });
 
-                font.pop(&ui);
+                font.pop();
             }
 
             // Store menu bar height with a bit of clearance
             self.last_menu_height = ui.window_size()[1] as u32 + Self::MENU_HEIGHT_CLEARANCE;
 
-            custom_font.pop(&ui);
-            menu_bar.end(&ui);
+            menu_bar.end();
         }
+
+        custom_font.pop();
 
         let gl_window = display.gl_window();
         self.platform.prepare_render(&ui, gl_window.window());
@@ -842,10 +822,10 @@ impl GUI {
     fn register_col_u16(ui: &Ui, name: &str, value: u16) {
         ui.align_text_to_frame_padding();
         ui.text(name);
-        ui.same_line(0.0);
-        let mut inp = ImString::new(format!("{:04X}", value));
+        ui.same_line();
+        let mut inp = format!("{:04X}", value);
         let width = ui.push_item_width(Self::WIDTH_TEXTBOX_REGISTER);
-        ui.input_text(&ImString::from(format!("##{}", name)), &mut inp)
+        ui.input_text(format!("##{}", name), &mut inp)
             .read_only(true)
             .build();
         width.pop(&ui);
@@ -855,10 +835,10 @@ impl GUI {
     fn register_col_u8(ui: &Ui, name: &str, value: u8) {
         ui.align_text_to_frame_padding();
         ui.text(name);
-        ui.same_line(0.0);
-        let mut inp = ImString::new(format!("{:02X}", value));
+        ui.same_line();
+        let mut inp = format!("{:02X}", value);
         let width = ui.push_item_width(Self::WIDTH_TEXTBOX_REGISTER);
-        ui.input_text(&ImString::from(format!("##{}", name)), &mut inp)
+        ui.input_text(format!("##{}", name), &mut inp)
             .read_only(true)
             .build();
         width.pop(&ui);
@@ -872,16 +852,16 @@ impl GUI {
         }
         ui.align_text_to_frame_padding();
         ui.text(name);
-        ui.same_line(0.0);
-        let mut inp = ImString::new(format!("{:04X}", value));
+        ui.same_line();
+        let mut inp = format!("{:04X}", value);
         let width = ui.push_item_width(Self::WIDTH_TEXTBOX_REGISTER);
-        ui.input_text(&ImString::from(format!("##{}", name)), &mut inp)
+        ui.input_text(format!("##{}", name), &mut inp)
             .read_only(true)
             .build();
         width.pop(&ui);
         ui.next_column();
         if let Some(style) = style {
-            style.pop(&ui);
+            style.pop();
         }
     }
 
@@ -892,53 +872,52 @@ impl GUI {
         }
         ui.align_text_to_frame_padding();
         ui.text(name);
-        ui.same_line(0.0);
-        let mut inp = ImString::new(format!("{:02X}", value));
+        ui.same_line();
+        let mut inp = format!("{:02X}", value);
         let width = ui.push_item_width(Self::WIDTH_TEXTBOX_REGISTER);
-        ui.input_text(&ImString::from(format!("##{}", name)), &mut inp)
+        ui.input_text(format!("##{}", name), &mut inp)
             .read_only(true)
             .build();
         width.pop(&ui);
         ui.next_column();
         if let Some(style) = style {
-            style.pop(&ui);
+            style.pop();
         }
     }
 
     fn opcode_text(ui: &Ui, name: &str, value: u16, description: &str) {
         ui.align_text_to_frame_padding();
         ui.text(name);
-        ui.same_line(0.0);
-        let mut inp = ImString::new(format!("{:04X}", value));
+        ui.same_line();
+        let mut inp = format!("{:04X}", value);
         let width = ui.push_item_width(Self::WIDTH_TEXTBOX_REGISTER);
-        ui.input_text(&ImString::from(format!("##{}", name)), &mut inp)
+        ui.input_text(format!("##{}", name), &mut inp)
             .read_only(true)
             .build();
         width.pop(&ui);
-        ui.same_line(0.0);
+        ui.same_line();
         ui.text(description);
     }
 
     fn breakpoint_input(
         ui: &Ui,
-        name: &ImStr,
+        name: &str,
         enabled: &mut bool,
-        value: &mut ImString,
+        value: &mut String,
         hex_chars: bool,
     ) -> bool {
         ui.checkbox(name, enabled);
-        ui.same_line(0.0);
+        ui.same_line();
         let width = ui.push_item_width(Self::WIDTH_TEXTBOX_REGISTER);
-        ui.input_text(&ImString::from(format!("##{}", name)), value)
+        ui.input_text(format!("##{}", name), value)
             .chars_hexadecimal(hex_chars)
             .chars_uppercase(true)
-            .resize_buffer(false)
             .build();
         width.pop(&ui);
         ui.is_item_deactivated_after_edit()
     }
 
-    fn toggle_button(ui: &Ui, text: &ImStr, size: [f32; 2], active: &mut bool) {
+    fn toggle_button(ui: &Ui, text: &str, size: [f32; 2], active: &mut bool) {
         if *active {
             let col0 = ui.push_style_color(
                 StyleColor::Button,
@@ -952,12 +931,12 @@ impl GUI {
                 StyleColor::ButtonActive,
                 [41.0 / 255.0, 74.0 / 255.0, 122.0 / 255.0, 0.75],
             );
-            if ui.button(text, size) {
+            if ui.button_with_size(text, size) {
                 *active = !*active;
             }
-            col0.pop(&ui);
-            col1.pop(&ui);
-            col2.pop(&ui);
+            col0.pop();
+            col1.pop();
+            col2.pop();
         } else {
             let col0 = ui.push_style_color(
                 StyleColor::Button,
@@ -971,18 +950,18 @@ impl GUI {
                 StyleColor::ButtonActive,
                 [15.0 / 255.0, 135.0 / 255.0, 250.0 / 255.0, 1.0],
             );
-            if ui.button(text, size) {
+            if ui.button_with_size(text, size) {
                 *active = !*active;
             }
-            col0.pop(&ui);
-            col1.pop(&ui);
-            col2.pop(&ui);
+            col0.pop();
+            col1.pop();
+            col2.pop();
         }
     }
 
-    fn button_disabled(ui: &Ui, text: &ImStr, size: [f32; 2], disabled: bool) -> bool {
+    fn button_disabled(ui: &Ui, text: &str, size: [f32; 2], disabled: bool) -> bool {
         if disabled {
-            ui.same_line(0.0);
+            ui.same_line();
             let col0 = ui.push_style_color(
                 imgui::StyleColor::Button,
                 [41.0 / 255.0, 74.0 / 255.0, 122.0 / 255.0, 0.25],
@@ -995,18 +974,18 @@ impl GUI {
                 imgui::StyleColor::ButtonActive,
                 [41.0 / 255.0, 74.0 / 255.0, 122.0 / 255.0, 0.25],
             );
-            let res = ui.button(text, size);
-            col0.pop(&ui);
-            col1.pop(&ui);
-            col2.pop(&ui);
+            let res = ui.button_with_size(text, size);
+            col0.pop();
+            col1.pop();
+            col2.pop();
             res
         } else {
-            ui.button(text, size)
+            ui.button_with_size(text, size)
         }
     }
 
-    fn centered_text(ui: &Ui, text: &ImStr, window_width: f32) {
-        let text_width = ui.calc_text_size(text, false, 0.0)[0];
+    fn centered_text(ui: &Ui, text: &str, window_width: f32) {
+        let text_width = ui.calc_text_size_with_opts(text, false, 0.0)[0];
         ui.set_cursor_pos([window_width / 2.0 - text_width / 2.0, ui.cursor_pos()[1]]);
         ui.text_wrapped(&text);
     }
@@ -1017,7 +996,7 @@ impl GUI {
 
     fn cpu_speed_menu_item(ui: &Ui, name: &str, item_speed: u32, current_speed: &mut u32) {
         let mut flag = *current_speed == item_speed;
-        MenuItem::new(&im_str!("{} ({}Hz)", name, item_speed)).build_with_ref(ui, &mut flag);
+        MenuItem::new(&format!("{} ({}Hz)", name, item_speed)).build_with_ref(ui, &mut flag);
         if flag {
             *current_speed = item_speed;
         }
@@ -1026,7 +1005,7 @@ impl GUI {
     fn menu_item_color_preset(
         ui: &Ui,
         preset_handler: &mut ColorPresetHandler,
-        name: &ImStr,
+        name: &str,
         preset: ColorPreset,
     ) -> bool {
         let active = &mut preset_handler.is_active(preset);
@@ -1042,7 +1021,7 @@ impl GUI {
     fn menu_item_quirks_preset(
         ui: &Ui,
         preset_handler: &mut QuirksPresetHandler,
-        name: &ImStr,
+        name: &str,
         preset: QuirksPreset,
     ) {
         let active = &mut preset_handler.is_active(preset);
@@ -1054,6 +1033,6 @@ impl GUI {
 
     pub fn display_error(&mut self, message: &str) {
         self.flag_error = true;
-        self.error_text = ImString::new(message);
+        self.error_text = String::from(message);
     }
 }
