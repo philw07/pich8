@@ -982,9 +982,9 @@ dependencies = [
 
 [[package]]
 name = "imgui-glium-renderer"
-version = "0.8.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc90d919aaa1fb05e4c58f0c3dad4a65f9233c2026cf8a3c549f721f3092da2c"
+checksum = "5af2c601e2bda3bdc6fd291c81f08c51bd04741f5ef2801d7e77324496cf12ce"
 dependencies = [
  "glium",
  "imgui",
