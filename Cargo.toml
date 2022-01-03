@@ -12,7 +12,7 @@ winres = "0.1.12"
 
 [dependencies]
 rand = "0.8.4"
-serde = { version = "1.0.132", features = ["derive"] }
+serde = { version = "1.0.133", features = ["derive"] }
 rmp-serde = "0.15.5"
 glium = "0.30.2"
 imgui = "0.8.2"
